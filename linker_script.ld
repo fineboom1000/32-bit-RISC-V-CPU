@@ -1,7 +1,7 @@
 /* linker_script.ld — minimal, LD-friendly, no allocated .stack section */
 
 MEMORY {
-    ROM (rx) : ORIGIN = 0x00001000, LENGTH = 64K
+    ROM (rx) : ORIGIN = 0x80000000, LENGTH = 64K # temp changed to 0x80000000 from 0x1000 due to testing.
     RAM (rwx) : ORIGIN = 0x20000000, LENGTH = 16K
 }
 
@@ -76,3 +76,4 @@ PROVIDE(_edata_vma = _edata);
 PROVIDE(_sbss_vma = _sbss);
 PROVIDE(_ebss_vma = _ebss);
 PROVIDE(_etext_vma = _etext);
+PROVIDE(_sidata = LOADADDR(.data));
