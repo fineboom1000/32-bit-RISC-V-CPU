@@ -50,44 +50,64 @@ works like this
 source = _sidata, dest = _sdata, end = _edata
 
 
-*/
 
-        /* startup.s — RV32 entry, defines _stext only */
+.data initialzed, we need the linker to put .data in ROM or the LMA section.
+Then on boot we take those bytes from ROM and put them into RAM, which
+is specifically done on their runtime addresses _sdata and _edata.
+.bss zeroed, verify by declaring uninitialized globals and checking they are all zero at runtime.
+Sp should be at __StackTop 
+we provide this value of __StackTop in the linker as equaling _estack
+recall that it will grow downwards.
+We will store that value of sp into a global varable in the program 
+before anything is done on the stack, so we can find where sp starts.
+*/
+    /* startup.s -- minimal RV32 startup:
+       - set SP to __StackTop (linker-provided)
+       - copy .data from _sidata -> _sdata.._edata
+       - zero .bss _sbss.._ebss
+       - store initial SP into __stack_pointer_initial for C to verify
+       - call main()
+    */
+
     .section .text
-    .align 2
-    .globl  _stext
+    .align  2
+    .global _stext
     .type   _stext, @function
 
 _stext:
-    /* set up stack pointer from linker-provided _estack */
-    la      sp, _estack
-    ebreak                 /* stop here so we can inspect sp */
+    /* Set stack pointer to the value supplied by linker: __StackTop */
+    la      sp, __StackTop        /* pseudo: load address of __StackTop into sp */
 
-    /* Copy .data from its LMA (_sidata) to VMA (_sdata.._edata) */
-    la      t0, _sidata
-    la      t1, _sdata
-    la      t2, _edata
-
-1:  beq     t1, t2, 2f
+    /* --- Copy .data: LMA (_sidata) -> VMA (_sdata.._edata) --- */
+    la      t0, _sidata           /* t0 = source in ROM (LMA) */
+    la      t1, _sdata            /* t1 = destination start (.data in RAM) */
+    la      t2, _edata            /* t2 = dest end */
+1:  beq     t0, t2, 2f
     lw      t3, 0(t0)
     sw      t3, 0(t1)
     addi    t0, t0, 4
     addi    t1, t1, 4
     j       1b
+2:
 
-2:  /* Zero .bss (_sbss .. _ebss) */
+    /* --- Zero .bss: _sbss.._ebss --- */
     la      t0, _sbss
     la      t1, _ebss
-
 3:  beq     t0, t1, 4f
-    sw      x0, 0(t0)
+    sw      zero, 0(t0)
     addi    t0, t0, 4
     j       3b
+4:
 
-4:  /* Call C entry point main (or asm main) */
+    /* Save the initial SP value into a global variable so C can check it.
+       __stack_pointer_initial is an uninitialized global (in .bss) that we write here. */
+    la      t0, __stack_pointer_initial
+    sw      sp, 0(t0)
+
+    /* Call main (C). ABI: a0..a1 are argument registers; none used here. */
     call    main
 
-hang:
-    j       hang
+    /* If main returns, just spin forever */
+5:  j       5b
 
-    .size _stext, .-_stext
+    .size _stext, . - _stext
