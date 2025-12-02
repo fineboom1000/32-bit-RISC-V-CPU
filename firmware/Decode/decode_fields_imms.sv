@@ -11,7 +11,7 @@ module decode_fields_imms (
   output logic [4:0]  rs2,
   output logic [6:0]  funct7,
 
-  // raw immediates (all sign-extended to 32 bits where appropriate)
+  // raw immediates (all sign-extended to 32 bits where appropriate aka LOOK AT MY ISA!)
   output logic [31:0] imm_i,
   output logic [31:0] imm_s,
   output logic [31:0] imm_b,
@@ -22,9 +22,9 @@ module decode_fields_imms (
   output logic [31:0] id_imm
 );
 
-  // -----------------------
+  
   // Field extraction (combinational)
-  // -----------------------
+ 
   assign opcode = id_instr[6:0];
   assign rd     = id_instr[11:7];
   assign funct3 = id_instr[14:12];
@@ -32,9 +32,9 @@ module decode_fields_imms (
   assign rs2    = id_instr[24:20];
   assign funct7 = id_instr[31:25];
 
-  // -----------------------
-  // Immediate generators
-  // -----------------------
+
+  // imm gens
+// prev by indented bit fields
 
   // I-type immediate: inst[31:20] signed
   assign imm_i = {{20{id_instr[31]}}, id_instr[31:20]};
@@ -57,10 +57,10 @@ module decode_fields_imms (
   assign imm_j_21 = { id_instr[31], id_instr[19:12], id_instr[20], id_instr[30:21], 1'b0 };
   assign imm_j = {{11{imm_j_21[20]}}, imm_j_21};
 
-  // -----------------------
+  
   // Immediate selector
-  // -----------------------
-  // Localparams for opcode readability (matching your ISA table)
+ 
+  // Localparams for opcode readability (matching ISA table)
   localparam logic [6:0] OPC_R_TYPE  = 7'b0110011; // R
   localparam logic [6:0] OPC_I_ALU   = 7'b0010011; // I-type ALU (addi, andi, ori...)
   localparam logic [6:0] OPC_LOAD    = 7'b0000011; // loads (lw)

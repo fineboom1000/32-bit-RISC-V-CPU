@@ -13,14 +13,14 @@ module regfile (
   output logic [31:0] rdata2
 );
 
-  logic [31:0] regs [31];
+  logic [31:0] regs [0:31];
 
   integer i;
   always_ff @(posedge clk) begin
     if (rst) begin
       regs[0] <= 32'd0;
       for (i = 1; i < 32; i = i + 1) regs[i] <= 32'd0;
-      // optionally set sp (x2) here if you want: regs[2] <= 32'h2000_0000;
+      // optionally set sp (x2) regs[2] <= 32'h2000_0000;
     end else begin
       if (wen && (waddr != 5'd0)) regs[waddr] <= wdata; // writes to x0 ignored
       regs[0] <= 32'd0; // enforce x0==0

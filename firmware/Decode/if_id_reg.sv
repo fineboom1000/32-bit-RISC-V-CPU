@@ -33,7 +33,7 @@ module if_id_reg #(
   always_ff @(posedge clk) begin
     if (rst) begin
       // on reset: choose safe defaults
-      id_pc_r       <= RESET_PC;    // align with your PC reset vector (see PC_reg). 
+      id_pc_r       <= RESET_PC;    // align with PC reset vector (see PC_reg). 
       id_pc_plus4_r <= RESET_PC + 32'd4;
       id_instr_r    <= NOP_INSTR;   // NOP (addi x0,x0,0) (this is a choice in my docs! Not needed)
     end else begin

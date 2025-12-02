@@ -29,7 +29,8 @@ easily understand the HW, I will follow that practice.
 */
 
 module PC_reg 
-#( parameter logic [31:0] RESET_VECTOR = 32'h0000_1000
+#( parameter logic [31:0] RESET_VECTOR = 32'h0000_1000 // ROM_ORGIN, if I put that in can the linker script see it.
+
 
 )
 
