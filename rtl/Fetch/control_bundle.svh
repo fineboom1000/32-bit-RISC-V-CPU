@@ -1,3 +1,4 @@
+// control bundle
 `timescale 1ns/1ps
 
 module control_bundle_pack (

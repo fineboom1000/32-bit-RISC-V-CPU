@@ -1,3 +1,6 @@
+
+// control_unit_min
+
 `timescale 1ns/1ps
 
 module control_unit_enhanced (
