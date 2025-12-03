@@ -1,64 +1,97 @@
-
-
-
-
 `timescale 1ns/1ps
 
-module if_id_reg #(
-  parameter logic [31:0] RESET_PC   = 32'h0000_1000, //  reset PC value (match PC_reg RESET_VECTOR)
-  parameter logic [31:0] NOP_INSTR  = 32'h0000_0013  // addi x0,x0,0 (RV32I NOP) = 0x00000013
+module id_ex_reg_fixed #(
+  parameter logic [31:0] NOP_IMM = 32'd0,
+  parameter CTRL_W = 16
 ) (
   input  logic         clk,
-  input  logic         rst,         // synchronous reset (active high)
-  input  logic         stall_id,    // when high: hold the current IF/ID contents
-  input  logic         flush_id,    // when high: inject a NOP into ID (KILL instruction)
+  input  logic         rst,
+  input  logic         stall_id,
+  input  logic         flush_ex,
 
-// discussed in my ISA notes doc, see Notion.
-  input  logic [31:0]  if_pc,
-  input  logic [31:0]  if_pc_plus4,
-  input  logic [31:0]  if_instruction,
+  // inputs from decode
+  input  logic [31:0]  id_pc,
+  input  logic [31:0]  id_pc_plus4,
+  input  logic [31:0]  id_rs1_val,
+  input  logic [31:0]  id_rs2_val,
+  input  logic [31:0]  id_imm,
+  input  logic [4:0]   id_rs1,
+  input  logic [4:0]   id_rs2,
+  input  logic [4:0]   id_rd,
+  input  logic [31:0]  id_instr,        // ADD THIS
+  input  logic [CTRL_W-1:0] id_ctrl,    // ADD THIS (packed control)
 
-// discussed in my ISA notes doc, see Notion.
-  output logic [31:0]  id_pc,
-  output logic [31:0]  id_pc_plus4,
-  output logic [31:0]  id_instr
+  // outputs to EX
+  output logic [31:0]  ex_pc,
+  output logic [31:0]  ex_pc_plus4,
+  output logic [31:0]  ex_rs1_val,
+  output logic [31:0]  ex_rs2_val,
+  output logic [31:0]  ex_imm,
+  output logic [4:0]   ex_rs1,
+  output logic [4:0]   ex_rs2,
+  output logic [4:0]   ex_rd,
+  output logic [31:0]  ex_instr,        // ADD THIS
+  output logic [CTRL_W-1:0] ex_ctrl     // ADD THIS (packed control)
 );
 
-  // discussed in my ISA notes doc, see Notion.
-  logic [31:0] id_pc_r;
-  logic [31:0] id_pc_plus4_r;
-  logic [31:0] id_instr_r;
+  // internal registers
+  logic [31:0] pc_r, pc_plus4_r, rs1v_r, rs2v_r, imm_r, instr_r;
+  logic [4:0]  rs1_r, rs2_r, rd_r;
+  logic [CTRL_W-1:0] ctrl_r;
 
-  // synchronous pipeline behaviour
   always_ff @(posedge clk) begin
     if (rst) begin
-      // on reset: choose safe defaults
-      id_pc_r       <= RESET_PC;    // align with PC reset vector (see PC_reg). 
-      id_pc_plus4_r <= RESET_PC + 32'd4;
-      id_instr_r    <= NOP_INSTR;   // NOP (addi x0,x0,0) (this is a choice in my docs! Not needed)
+      pc_r         <= 32'd0;
+      pc_plus4_r   <= 32'd0;
+      rs1v_r       <= 32'd0;
+      rs2v_r       <= 32'd0;
+      imm_r        <= NOP_IMM;
+      rs1_r        <= 5'd0;
+      rs2_r        <= 5'd0;
+      rd_r         <= 5'd0;
+      instr_r      <= 32'h0000_0013;  // NOP
+      ctrl_r       <= {CTRL_W{1'b0}};
     end else begin
       if (stall_id) begin
-        // hold previous values do nothing 
-        id_pc_r       <= id_pc_r;
-        id_pc_plus4_r <= id_pc_plus4_r;
-        id_instr_r    <= id_instr_r;
-      end else if (flush_id) begin
-        // inject NOP: kill this slot
-        id_pc_r       <= if_pc;         // optional: keep the PC for debug, or set to 0
-        id_pc_plus4_r <= if_pc_plus4;   // useful for debug/tracing
-        id_instr_r    <= NOP_INSTR;     // kill the instruction in ID stage
+        // hold: do nothing
+      end else if (flush_ex) begin
+        // inject NOP into EX
+        pc_r         <= id_pc;
+        pc_plus4_r   <= id_pc_plus4;
+        rs1v_r       <= 32'd0;
+        rs2v_r       <= 32'd0;
+        imm_r        <= NOP_IMM;
+        rs1_r        <= 5'd0;
+        rs2_r        <= 5'd0;
+        rd_r         <= 5'd0;
+        instr_r      <= 32'h0000_0013;
+        ctrl_r       <= {CTRL_W{1'b0}};
       end else begin
-        // normal update: accept the values coming from fetch
-        id_pc_r       <= if_pc;
-        id_pc_plus4_r <= if_pc_plus4;
-        id_instr_r    <= if_instruction;
+        // normal capture
+        pc_r         <= id_pc;
+        pc_plus4_r   <= id_pc_plus4;
+        rs1v_r       <= id_rs1_val;
+        rs2v_r       <= id_rs2_val;
+        imm_r        <= id_imm;
+        rs1_r        <= id_rs1;
+        rs2_r        <= id_rs2;
+        rd_r         <= id_rd;
+        instr_r      <= id_instr;
+        ctrl_r       <= id_ctrl;
       end
     end
   end
 
-  // drive outputs discussed in my ISA notes doc, see Notion.
-  assign id_pc       = id_pc_r;
-  assign id_pc_plus4 = id_pc_plus4_r;
-  assign id_instr    = id_instr_r;
+  // outputs
+  assign ex_pc         = pc_r;
+  assign ex_pc_plus4   = pc_plus4_r;
+  assign ex_rs1_val    = rs1v_r;
+  assign ex_rs2_val    = rs2v_r;
+  assign ex_imm        = imm_r;
+  assign ex_rs1        = rs1_r;
+  assign ex_rs2        = rs2_r;
+  assign ex_rd         = rd_r;
+  assign ex_instr      = instr_r;
+  assign ex_ctrl       = ctrl_r;
 
 endmodule

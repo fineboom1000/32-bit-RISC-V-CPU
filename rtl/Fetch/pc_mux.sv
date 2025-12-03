@@ -1,4 +1,4 @@
-/*
+/* pc_mux
 
 The purpose of this module is so the PC either branches or
 +4s depending on a cntrl sig
@@ -112,17 +112,18 @@ Now as for the index of however ROM counts, that is entirely up to you, dependin
 */
 
 
-module pc_mux(
-    input  logic [31:0] pc_plus4,
-    input  logic [31:0] branch_target,
-    input  logic        pc_src,
-    output logic [31:0] pc_next
+`timescale 1ns/1ps
+
+module pc_mux (
+  input  logic [31:0] pc_plus4,
+  input  logic [31:0] branch_target,
+  input  logic        pc_src,         // 0=sequential, 1=branch/jump
+  output logic [31:0] pc_next
 );
 
-    assign pc_next = pc_src ? branch_target : pc_plus4;
+  assign pc_next = pc_src ? branch_target : pc_plus4;
 
 endmodule
-
 
 /*
 

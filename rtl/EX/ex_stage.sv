@@ -1,4 +1,4 @@
-// ex_stage.sv
+/ ex_stage.sv
 // Minimal EX stage: unpack control bundle, select operands, ALU instantiation,
 // branch decision logic, produce EX->MEM outputs.
 // Assumes ex_in_ctrl is packed as described in spec (example 16-bit layout).
@@ -97,7 +97,7 @@ module ex_stage #(
       op_a = op_a_pre;
   end
 
-  // operand B selection + forwarding
+  // operand B forwarding (before alu_src mux)
   logic [31:0] op_b_rf_or_fwd;
   always_comb begin
     if (fwd_mem_valid && (fwd_mem_rd != 5'd0) && (fwd_mem_rd == ex_in_rs2))
@@ -108,8 +108,13 @@ module ex_stage #(
       op_b_rf_or_fwd = op_b_pre;
   end
 
-  // final operand B selected by alu_src
+  // final operand B selected by alu_src (for ALU input)
   assign op_b = ctrl_alu_src ? ex_in_imm : op_b_rf_or_fwd;
+
+  //  FIX!??!??!? Store data must use forwarded rs2, NOT ex_in_rs2_data
+  // stores need the actual register value (potentially forwarded), not the immediate
+  logic [31:0] rs2_for_store;
+  assign rs2_for_store = op_b_rf_or_fwd;  // Use forwarded rs2 value
 
   // instantiate ALU
   logic [31:0] alu_result;
@@ -148,7 +153,7 @@ module ex_stage #(
 
   // EX outputs (combinational)
   assign ex_out_alu_result      = alu_result;
-  assign ex_out_rs2_for_store   = ex_in_rs2_data; // store uses original rs2_data (not imm)
+  assign ex_out_rs2_for_store   = rs2_for_store;  // FIXED: use forwarded value
   assign ex_out_rd              = ex_in_rd;
   assign ex_out_ctrl            = ex_in_ctrl;
   assign ex_out_branch_taken    = branch_taken_local;

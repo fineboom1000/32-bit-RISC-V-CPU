@@ -1,4 +1,4 @@
-/*
+/* pc_reg.sv
 
 
 if I new the synatx it would be like
@@ -27,27 +27,26 @@ easily understand the HW, I will follow that practice.
 
 
 */
+`timescale 1ns/1ps
 
-module PC_reg 
-#( parameter logic [31:0] RESET_VECTOR = 32'h0000_1000 // ROM_ORGIN, if I put that in can the linker script see it.
-
-
-)
-
-(
-    input logic clk, rst,
-    input logic[31:0] pc_next,
-    output logic[31:0] pc_curr
+module pc_reg #(
+  parameter logic [31:0] RESET_VECTOR = 32'h0000_1000
+) (
+  input  logic        clk,
+  input  logic        rst,
+  input  logic        stall,        // when high, hold PC (don't advance)
+  input  logic [31:0] pc_next,      // next PC value (from pc_mux)
+  output logic [31:0] pc_current    // current PC value
 );
 
-always_ff @(posedge clk) begin
+  always_ff @(posedge clk) begin
     if (rst) begin
-        pc_curr <= RESET_VECTOR;
-    end else begin
-        pc_curr <= pc_next;
+      pc_current <= RESET_VECTOR;
+    end else if (!stall) begin
+      pc_current <= pc_next;
     end
-end
-// fI learnt to use begin/end around if else blocks
-// its safer and the cannonical style for regisiters.
+    // if stall, hold current value (do nothing)
+  end
+
 endmodule
 

@@ -34,7 +34,7 @@ module alu #(
 
   // compute add/sub
   assign add_result = a + b;
-  assign sub_result = a - b; // synthesizes to adder with invert+carry or native subtract
+  assign sub_result = a - b;
 
   // combinational ALU
   always_comb begin

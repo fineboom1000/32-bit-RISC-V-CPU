@@ -1,32 +1,31 @@
-// decode.sv
+// decode.sv - COMPLETE FIXED VERSION
 `timescale 1ns/1ps
 
-//  wires decode_fields_imms, regfile, and control_unit_min,
-// produces signals to ID/EX register.
-
-module decode (
+module decode #(
+  parameter CTRL_W = 16
+) (
   input  logic         clk,
   input  logic         rst,
-  input  logic         stall_id,    // from hazard unit (not yet implemented)
-  input  logic         flush_id,    // from hazard unit / branch resolution
+  input  logic         stall_id,
+  input  logic         flush_id,
 
   // inputs from IF/ID
   input  logic [31:0]  id_instr,
   input  logic [31:0]  id_pc,
   input  logic [31:0]  id_pc_plus4,
 
-  // register file interface (to regfile module)
+  // register file interface
   output logic [4:0]   rf_raddr1,
   output logic [4:0]   rf_raddr2,
   input  logic [31:0]  rf_rdata1,
   input  logic [31:0]  rf_rdata2,
 
-  // writeback interface (to regfile): connect WB stage later
+  // writeback interface (from WB stage)
   input  logic         wb_wen,
   input  logic [4:0]   wb_waddr,
   input  logic [31:0]  wb_wdata,
 
-  // outputs to ID/EX latched)
+  // outputs to EX stage (via ID/EX register)
   output logic [31:0]  idex_pc,
   output logic [31:0]  idex_pc_plus4,
   output logic [31:0]  idex_rs1_val,
@@ -35,18 +34,11 @@ module decode (
   output logic [4:0]   idex_rs1,
   output logic [4:0]   idex_rs2,
   output logic [4:0]   idex_rd,
-  output logic [3:0]   idex_alu_op,
-  output logic         idex_alu_src,
-  output logic         idex_reg_write,
-  output logic         idex_mem_read,
-  output logic         idex_mem_write,
-  output logic         idex_mem_to_reg,
-  output logic         idex_branch,
-  output logic [1:0]   idex_branch_type,
-  output logic         idex_jump
+  output logic [31:0]  idex_instr,
+  output logic [CTRL_W-1:0] idex_ctrl
 );
 
-  // internal wires from decode_fields_imms
+  // Internal wires from decode_fields_imms
   logic [6:0]  opcode;
   logic [4:0]  rd;
   logic [2:0]  funct3;
@@ -56,7 +48,7 @@ module decode (
   logic [31:0] imm_i, imm_s, imm_b, imm_u, imm_j;
   logic [31:0] id_imm;
 
-  // instantiate decode_fields_imms (combinational
+  // Instantiate decode_fields_imms
   decode_fields_imms dfim (
     .id_instr(id_instr),
     .id_pc(id_pc),
@@ -74,21 +66,25 @@ module decode (
     .id_imm(id_imm)
   );
 
-  // register file read addresses
+  // Register file read addresses
   assign rf_raddr1 = rs1;
   assign rf_raddr2 = rs2;
 
-  // apply x0 semantics (if regfile not already)
+  // Apply x0 semantics
   logic [31:0] rs1_val_pre, rs2_val_pre;
   assign rs1_val_pre = (rs1 == 5'd0) ? 32'd0 : rf_rdata1;
   assign rs2_val_pre = (rs2 == 5'd0) ? 32'd0 : rf_rdata2;
 
-  // instantiate minimal control unit
-  logic [3:0] alu_op;
-  logic       alu_src, reg_write, mem_read, mem_write, mem_to_reg, branch, jump;
-  logic [1:0] branch_type;
+  // Control unit signals
+  logic [3:0]  alu_op;
+  logic        alu_src, reg_write, mem_read, mem_write, mem_to_reg, branch, jump;
+  logic [1:0]  branch_type;
+  logic [1:0]  mem_width;
+  logic        mem_signed;
+  logic [1:0]  wb_sel;
 
-  control_unit_min cu (
+  // Instantiate enhanced control unit
+  control_unit_enhanced cu (
     .opcode(opcode),
     .funct3(funct3),
     .funct7(funct7),
@@ -100,11 +96,41 @@ module decode (
     .mem_to_reg(mem_to_reg),
     .branch(branch),
     .branch_type(branch_type),
-    .jump(jump)
+    .jump(jump),
+    .mem_width(mem_width),
+    .mem_signed(mem_signed),
+    .wb_sel(wb_sel)
   );
 
-  // ID->EX register: latch values (handles stall/flush)
-  id_ex_reg idex (
+  // Pack control signals into bundle
+  logic [CTRL_W-1:0] id_ctrl_bundle;
+  
+  control_bundle_pack ctrl_pack (
+    .alu_op(alu_op),
+    .alu_src(alu_src),
+    .reg_write(reg_write),
+    .mem_read(mem_read),
+    .mem_write(mem_write),
+    .mem_to_reg(mem_to_reg),
+    .branch(branch),
+    .branch_type(branch_type),
+    .jump(jump),
+    .mem_width(mem_width),
+    .mem_signed(mem_signed),
+    .wb_sel(wb_sel),
+    .ctrl_bundle(id_ctrl_bundle)
+  );
+
+  // Internal wires from ID/EX register outputs
+  logic [31:0] ex_pc_out, ex_pc_plus4_out, ex_rs1_val_out, ex_rs2_val_out;
+  logic [31:0] ex_imm_out, ex_instr_out;
+  logic [4:0]  ex_rs1_out, ex_rs2_out, ex_rd_out;
+  logic [CTRL_W-1:0] ex_ctrl_out;
+
+  // ID->EX register
+  id_ex_reg_fixed #(
+    .CTRL_W(CTRL_W)
+  ) idex (
     .clk(clk),
     .rst(rst),
     .stall_id(stall_id),
@@ -119,53 +145,32 @@ module decode (
     .id_rs1(rs1),
     .id_rs2(rs2),
     .id_rd(rd),
-    .id_alu_op(alu_op),
-    .id_alu_src(alu_src),
-    .id_reg_write(reg_write),
-    .id_mem_read(mem_read),
-    .id_mem_write(mem_write),
-    .id_mem_to_reg(mem_to_reg),
-    .id_branch(branch),
-    .id_branch_type(branch_type),
-    .id_jump(jump),
+    .id_instr(id_instr),
+    .id_ctrl(id_ctrl_bundle),
 
-    // outputs to EX (also wired out of decode module)
-    .ex_pc(idex_pc),
-    .ex_pc_plus4(idex_pc_plus4),
-    .ex_rs1_val(idex_rs1_val),
-    .ex_rs2_val(idex_rs2_val),
-    .ex_imm(idex_imm),
-    .ex_rs1(idex_rs1),
-    .ex_rs2(idex_rs2),
-    .ex_rd(idex_rd),
-    .ex_alu_op(idex_alu_op),
-    .ex_alu_src(idex_alu_src),
-    .ex_reg_write(idex_reg_write),
-    .ex_mem_read(idex_mem_read),
-    .ex_mem_write(idex_mem_write),
-    .ex_mem_to_reg(idex_mem_to_reg),
-    .ex_branch(idex_branch),
-    .ex_branch_type(idex_branch_type),
-    .ex_jump(idex_jump)
+    // outputs to EX
+    .ex_pc(ex_pc_out),
+    .ex_pc_plus4(ex_pc_plus4_out),
+    .ex_rs1_val(ex_rs1_val_out),
+    .ex_rs2_val(ex_rs2_val_out),
+    .ex_imm(ex_imm_out),
+    .ex_rs1(ex_rs1_out),
+    .ex_rs2(ex_rs2_out),
+    .ex_rd(ex_rd_out),
+    .ex_instr(ex_instr_out),
+    .ex_ctrl(ex_ctrl_out)
   );
 
-  // Connect idex outputs to module outputs (simple pass-through)
-  assign idex_pc         = idex_pc;
-  assign idex_pc_plus4   = idex_pc_plus4;
-  assign idex_rs1_val    = idex_rs1_val;
-  assign idex_rs2_val    = idex_rs2_val;
-  assign idex_imm        = idex_imm;
-  assign idex_rs1        = idex_rs1;
-  assign idex_rs2        = idex_rs2;
-  assign idex_rd         = idex_rd;
-  assign idex_alu_op     = idex_alu_op;
-  assign idex_alu_src    = idex_alu_src;
-  assign idex_reg_write  = idex_reg_write;
-  assign idex_mem_read   = idex_mem_read;
-  assign idex_mem_write  = idex_mem_write;
-  assign idex_mem_to_reg = idex_mem_to_reg;
-  assign idex_branch     = idex_branch;
-  assign idex_branch_type= idex_branch_type;
-  assign idex_jump       = idex_jump;
+  // Connect ID/EX register outputs to module outputs
+  assign idex_pc       = ex_pc_out;
+  assign idex_pc_plus4 = ex_pc_plus4_out;
+  assign idex_rs1_val  = ex_rs1_val_out;
+  assign idex_rs2_val  = ex_rs2_val_out;
+  assign idex_imm      = ex_imm_out;
+  assign idex_rs1      = ex_rs1_out;
+  assign idex_rs2      = ex_rs2_out;
+  assign idex_rd       = ex_rd_out;
+  assign idex_instr    = ex_instr_out;
+  assign idex_ctrl     = ex_ctrl_out;
 
 endmodule

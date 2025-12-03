@@ -7,45 +7,41 @@
 // This is a wrapper used for wiring,
 // and is responsible for nothing else but wiring.
 
-
+//fetch_wiring
 
 `timescale 1ns/1ps
 
 module fetch_wiring #(
-    // for flexiblitity
-    parameter logic [31:0] ROM_BASE = 32'h00001000,
-    parameter string IMEM_FILE = "imem.hex",
-    parameter int IMEM_WORDS = 4096,
-    parameter bit IMEM_SYNC = 1
+  parameter logic [31:0] ROM_BASE = 32'h0000_1000,
+  parameter string IMEM_FILE = "imem.hex",
+  parameter int IMEM_WORDS = 4096,
+  parameter bit IMEM_SYNC = 1
 ) (
-    input  logic        clk,
-    input  logic        imem_read_en,   // tie high ... no use for enable.
-    input  logic [31:0] pc_current,     // connect to PC register output
-    input  logic [31:0] pc_plus4,       // connect to existing PC+4 adder output
+  input  logic        clk,
+  input  logic        imem_read_en,
+  input  logic [31:0] pc_current,
+  input  logic [31:0] pc_plus4,
 
-    // branch logic remains external; this module only performs fetch/read
-    output logic [31:0] if_pc,          // forwarded PC for decode
-    output logic [31:0] if_pc_plus4,    // forwarded PC+4 for decode
-    output logic [31:0] if_instruction  // instruction read from IMEM 
-    // note sync should make this 1 cycle late if sync is active high.
-
+  output logic [31:0] if_pc,
+  output logic [31:0] if_pc_plus4,
+  output logic [31:0] if_instruction
 );
 
-    // instantiate IMEM 
-    imem #(
-        .MEMFILE(IMEM_FILE),
-        .ROM_BASE(ROM_BASE),
-        .WORDS(IMEM_WORDS),
-        .SYNC(IMEM_SYNC)
-    ) imem_inst (
-        .clk(clk),
-        .read_en(imem_read_en),
-        .addr(pc_current),
-        .instruction(if_instruction)
-    );
+  // instantiate instruction memory
+  imem #(
+    .MEMFILE(IMEM_FILE),
+    .ROM_BASE(ROM_BASE),
+    .WORDS(IMEM_WORDS),
+    .SYNC(IMEM_SYNC)
+  ) imem_inst (
+    .clk(clk),
+    .read_en(imem_read_en),
+    .addr(pc_current),
+    .instruction(if_instruction)
+  );
 
-    // pass-throughs to decode stage
-    assign if_pc = pc_current;
-    assign if_pc_plus4 = pc_plus4;
+  // pass PC values through to IF/ID register
+  assign if_pc = pc_current;
+  assign if_pc_plus4 = pc_plus4;
 
 endmodule

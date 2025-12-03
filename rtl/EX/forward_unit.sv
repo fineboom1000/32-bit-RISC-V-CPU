@@ -1,15 +1,6 @@
 // forward_unit.sv
-// Present MEM-/ WB-stage forwarding candidates to EX stage.
+// Present MEM/WB-stage forwarding candidates to EX stage.
 // The EX stage does the matching (rd == rsX) and priority selection (MEM -> WB -> RF).
-// This module simply exposes the currently available MEM and WB values and metadata.
-//
-// Inputs:
-//  - mem_rd, mem_wdata, mem_reg_write   : info from MEM stage (EX/MEM pipeline)
-//  - wb_rd,  wb_wdata,  wb_reg_write    : info from WB stage
-//
-// Outputs (to EX stage forwarding muxes):
-//  - fwd_mem_data, fwd_mem_rd, fwd_mem_valid
-//  - fwd_wb_data,  fwd_wb_rd,  fwd_wb_valid
 
 `timescale 1ns/1ps
 
@@ -42,4 +33,3 @@ module forward_unit (
   assign fwd_wb_valid  = wb_reg_write;
 
 endmodule
-

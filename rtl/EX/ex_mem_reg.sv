@@ -1,4 +1,3 @@
-// ex_mem_reg.sv
 // EX -> MEM pipeline register with stall/flush semantics.
 // Latches EX outputs into MEM inputs.
 
@@ -36,7 +35,7 @@ module ex_mem_reg #(
 );
 
   // synchronous pipeline register
-  always_ff @(posedge clk or posedge rst) begin
+  always_ff @(posedge clk) begin
     if (rst) begin
       mem_out_alu_result      <= 32'd0;
       mem_out_rs2_for_store   <= 32'd0;
