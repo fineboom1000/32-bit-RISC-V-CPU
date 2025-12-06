@@ -1,97 +1,58 @@
+// if_id_reg.sv
+// IF -> ID pipeline register
+// Latches instruction and PC from fetch stage to decode stage
 `timescale 1ns/1ps
 
-module id_ex_reg_fixed #(
-  parameter logic [31:0] NOP_IMM = 32'd0,
-  parameter CTRL_W = 16
+module if_id_reg #(
+  parameter logic [31:0] RESET_PC = 32'h0000_1000,
+  parameter logic [31:0] NOP_INSTR = 32'h0000_0013  // addi x0, x0, 0
 ) (
-  input  logic         clk,
-  input  logic         rst,
-  input  logic         stall_id,
-  input  logic         flush_ex,
+  input  logic        clk,
+  input  logic        rst,
+  input  logic        stall_id,     // when high, hold current values
+  input  logic        flush_id,     // when high, inject NOP
 
-  // inputs from decode
-  input  logic [31:0]  id_pc,
-  input  logic [31:0]  id_pc_plus4,
-  input  logic [31:0]  id_rs1_val,
-  input  logic [31:0]  id_rs2_val,
-  input  logic [31:0]  id_imm,
-  input  logic [4:0]   id_rs1,
-  input  logic [4:0]   id_rs2,
-  input  logic [4:0]   id_rd,
-  input  logic [31:0]  id_instr,        // ADD THIS
-  input  logic [CTRL_W-1:0] id_ctrl,    // ADD THIS (packed control)
+  // inputs from IF stage
+  input  logic [31:0] if_pc,
+  input  logic [31:0] if_pc_plus4,
+  input  logic [31:0] if_instruction,
 
-  // outputs to EX
-  output logic [31:0]  ex_pc,
-  output logic [31:0]  ex_pc_plus4,
-  output logic [31:0]  ex_rs1_val,
-  output logic [31:0]  ex_rs2_val,
-  output logic [31:0]  ex_imm,
-  output logic [4:0]   ex_rs1,
-  output logic [4:0]   ex_rs2,
-  output logic [4:0]   ex_rd,
-  output logic [31:0]  ex_instr,        // ADD THIS
-  output logic [CTRL_W-1:0] ex_ctrl     // ADD THIS (packed control)
+  // outputs to ID stage
+  output logic [31:0] id_pc,
+  output logic [31:0] id_pc_plus4,
+  output logic [31:0] id_instr
 );
 
-  // internal registers
-  logic [31:0] pc_r, pc_plus4_r, rs1v_r, rs2v_r, imm_r, instr_r;
-  logic [4:0]  rs1_r, rs2_r, rd_r;
-  logic [CTRL_W-1:0] ctrl_r;
+  // Internal registers
+  logic [31:0] pc_r;
+  logic [31:0] pc_plus4_r;
+  logic [31:0] instr_r;
 
   always_ff @(posedge clk) begin
     if (rst) begin
-      pc_r         <= 32'd0;
-      pc_plus4_r   <= 32'd0;
-      rs1v_r       <= 32'd0;
-      rs2v_r       <= 32'd0;
-      imm_r        <= NOP_IMM;
-      rs1_r        <= 5'd0;
-      rs2_r        <= 5'd0;
-      rd_r         <= 5'd0;
-      instr_r      <= 32'h0000_0013;  // NOP
-      ctrl_r       <= {CTRL_W{1'b0}};
+      pc_r       <= RESET_PC;
+      pc_plus4_r <= RESET_PC + 32'd4;
+      instr_r    <= NOP_INSTR;
     end else begin
       if (stall_id) begin
-        // hold: do nothing
-      end else if (flush_ex) begin
-        // inject NOP into EX
-        pc_r         <= id_pc;
-        pc_plus4_r   <= id_pc_plus4;
-        rs1v_r       <= 32'd0;
-        rs2v_r       <= 32'd0;
-        imm_r        <= NOP_IMM;
-        rs1_r        <= 5'd0;
-        rs2_r        <= 5'd0;
-        rd_r         <= 5'd0;
-        instr_r      <= 32'h0000_0013;
-        ctrl_r       <= {CTRL_W{1'b0}};
+        // Hold current values (do nothing)
+      end else if (flush_id) begin
+        // Inject NOP (bubble in pipeline)
+        pc_r       <= if_pc;
+        pc_plus4_r <= if_pc_plus4;
+        instr_r    <= NOP_INSTR;
       end else begin
-        // normal capture
-        pc_r         <= id_pc;
-        pc_plus4_r   <= id_pc_plus4;
-        rs1v_r       <= id_rs1_val;
-        rs2v_r       <= id_rs2_val;
-        imm_r        <= id_imm;
-        rs1_r        <= id_rs1;
-        rs2_r        <= id_rs2;
-        rd_r         <= id_rd;
-        instr_r      <= id_instr;
-        ctrl_r       <= id_ctrl;
+        // Normal capture
+        pc_r       <= if_pc;
+        pc_plus4_r <= if_pc_plus4;
+        instr_r    <= if_instruction;
       end
     end
   end
 
-  // outputs
-  assign ex_pc         = pc_r;
-  assign ex_pc_plus4   = pc_plus4_r;
-  assign ex_rs1_val    = rs1v_r;
-  assign ex_rs2_val    = rs2v_r;
-  assign ex_imm        = imm_r;
-  assign ex_rs1        = rs1_r;
-  assign ex_rs2        = rs2_r;
-  assign ex_rd         = rd_r;
-  assign ex_instr      = instr_r;
-  assign ex_ctrl       = ctrl_r;
+  // Outputs
+  assign id_pc       = pc_r;
+  assign id_pc_plus4 = pc_plus4_r;
+  assign id_instr    = instr_r;
 
 endmodule
