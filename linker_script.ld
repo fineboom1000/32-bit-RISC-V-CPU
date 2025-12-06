@@ -1,7 +1,7 @@
-/* linker_script.ld — minimal, LD-friendly, no allocated .stack section */
+
 
 MEMORY {
-    ROM (rx) : ORIGIN = 0x00001000, LENGTH = 64K # temp changed to 0x80000000 from 0x1000 due to testing.
+    ROM (rx) : ORIGIN = 0x00001000, LENGTH = 64K
     RAM (rwx) : ORIGIN = 0x20000000, LENGTH = 16K
 }
 
@@ -30,19 +30,27 @@ SECTIONS
     . = ORIGIN(ROM);
     . = ALIGN(4);
     _stext = .;
-    KEEP(*(.isr_vector))
+    KEEP(*(.text.startup))
     *(.text*)
+    . = ALIGN(4);
+  } > ROM
+
+  .rodata : AT(LOADADDR(.text) + SIZEOF(.text))
+  {
+    . = ALIGN(4);
     *(.rodata*)
+    *(.srodata*)
     . = ALIGN(4);
     _etext = .;
   } > ROM
 
-  .data : AT(ADDR(.text) + SIZEOF(.text)) 
+  .data : AT(LOADADDR(.rodata) + SIZEOF(.rodata))
   {
     . = ALIGN(4);
     _sdata = .;
     *(.data*)
     *(.data.*)
+    *(.sdata*)
     . = ALIGN(4);
     _edata = .;
   } > RAM
@@ -52,6 +60,7 @@ SECTIONS
     . = ALIGN(4);
     _sbss = .;
     *(.bss*)
+    *(.sbss*)
     *(COMMON)
     . = ALIGN(4);
     _ebss = .;

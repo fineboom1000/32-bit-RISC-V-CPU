@@ -1,0 +1,148 @@
+
+program.elf:     file format elf32-littleriscv
+
+
+Disassembly of section .text:
+
+00001000 <_stext>:
+    1000:	1ffff297          	auipc	t0,0x1ffff
+    1004:	01028293          	addi	t0,t0,16 # 20000010 <__stack_pointer_initial>
+    1008:	0022a023          	sw	sp,0(t0)
+    100c:	20003117          	auipc	sp,0x20003
+    1010:	ff410113          	addi	sp,sp,-12 # 20004000 <_RAM_END>
+    1014:	00000297          	auipc	t0,0x0
+    1018:	14c28293          	addi	t0,t0,332 # 1160 <_etext>
+    101c:	1ffff317          	auipc	t1,0x1ffff
+    1020:	fe430313          	addi	t1,t1,-28 # 20000000 <_RAM_ORG>
+    1024:	1ffff397          	auipc	t2,0x1ffff
+    1028:	fec38393          	addi	t2,t2,-20 # 20000010 <__stack_pointer_initial>
+    102c:	00730c63          	beq	t1,t2,1044 <_stext+0x44>
+    1030:	0002ae03          	lw	t3,0(t0)
+    1034:	01c32023          	sw	t3,0(t1)
+    1038:	00428293          	addi	t0,t0,4
+    103c:	00430313          	addi	t1,t1,4
+    1040:	fe7348e3          	blt	t1,t2,1030 <_stext+0x30>
+    1044:	1ffff297          	auipc	t0,0x1ffff
+    1048:	fcc28293          	addi	t0,t0,-52 # 20000010 <__stack_pointer_initial>
+    104c:	1ffff317          	auipc	t1,0x1ffff
+    1050:	fd830313          	addi	t1,t1,-40 # 20000024 <__heap_start>
+    1054:	00628863          	beq	t0,t1,1064 <_stext+0x64>
+    1058:	0002a023          	sw	zero,0(t0)
+    105c:	00428293          	addi	t0,t0,4
+    1060:	fe62cce3          	blt	t0,t1,1058 <_stext+0x58>
+    1064:	008000ef          	jal	106c <main>
+    1068:	0000006f          	j	1068 <_stext+0x68>
+
+0000106c <main>:
+    106c:	200007b7          	lui	a5,0x20000
+    1070:	00078793          	mv	a5,a5
+    1074:	0007a683          	lw	a3,0(a5) # 20000000 <_RAM_ORG>
+    1078:	11111737          	lui	a4,0x11111
+    107c:	11170713          	addi	a4,a4,273 # 11111111 <_RAM_LEN+0x1110d111>
+    1080:	0ce69863          	bne	a3,a4,1150 <main+0xe4>
+    1084:	0047a683          	lw	a3,4(a5)
+    1088:	22222737          	lui	a4,0x22222
+    108c:	22270713          	addi	a4,a4,546 # 22222222 <_RAM_END+0x221e222>
+    1090:	0ce69063          	bne	a3,a4,1150 <main+0xe4>
+    1094:	0087a683          	lw	a3,8(a5)
+    1098:	33333737          	lui	a4,0x33333
+    109c:	33370713          	addi	a4,a4,819 # 33333333 <_RAM_END+0x1332f333>
+    10a0:	0ae69863          	bne	a3,a4,1150 <main+0xe4>
+    10a4:	00c7a603          	lw	a2,12(a5)
+    10a8:	bbbbc7b7          	lui	a5,0xbbbbc
+    10ac:	bbc78793          	addi	a5,a5,-1092 # bbbbbbbc <_RAM_END+0x9bbb7bbc>
+    10b0:	00f60633          	add	a2,a2,a5
+    10b4:	00c03633          	snez	a2,a2
+    10b8:	200006b7          	lui	a3,0x20000
+    10bc:	01468693          	addi	a3,a3,20 # 20000014 <bss_array>
+    10c0:	00000793          	li	a5,0
+    10c4:	00400593          	li	a1,4
+    10c8:	00279713          	slli	a4,a5,0x2
+    10cc:	00e68733          	add	a4,a3,a4
+    10d0:	00072703          	lw	a4,0(a4)
+    10d4:	00178793          	addi	a5,a5,1
+    10d8:	06071863          	bnez	a4,1148 <main+0xdc>
+    10dc:	feb796e3          	bne	a5,a1,10c8 <main+0x5c>
+    10e0:	200007b7          	lui	a5,0x20000
+    10e4:	0107a703          	lw	a4,16(a5) # 20000010 <__stack_pointer_initial>
+    10e8:	200047b7          	lui	a5,0x20004
+    10ec:	00078793          	mv	a5,a5
+    10f0:	00f70463          	beq	a4,a5,10f8 <main+0x8c>
+    10f4:	00466613          	ori	a2,a2,4
+    10f8:	deadc7b7          	lui	a5,0xdeadc
+    10fc:	eef78793          	addi	a5,a5,-273 # deadbeef <_RAM_END+0xbead7eef>
+    1100:	cafec737          	lui	a4,0xcafec
+    1104:	00f6a023          	sw	a5,0(a3)
+    1108:	abe70713          	addi	a4,a4,-1346 # cafebabe <_RAM_END+0xaafe7abe>
+    110c:	00e6a223          	sw	a4,4(a3)
+    1110:	0006a583          	lw	a1,0(a3)
+    1114:	02f58463          	beq	a1,a5,113c <main+0xd0>
+    1118:	00866613          	ori	a2,a2,8
+    111c:	20004737          	lui	a4,0x20004
+    1120:	00070793          	mv	a5,a4
+    1124:	fec72823          	sw	a2,-16(a4) # 20003ff0 <__StackLimit+0xff0>
+    1128:	00100713          	li	a4,1
+    112c:	fee7aa23          	sw	a4,-12(a5)
+    1130:	00000013          	nop
+    1134:	00000013          	nop
+    1138:	ff9ff06f          	j	1130 <main+0xc4>
+    113c:	0046a783          	lw	a5,4(a3)
+    1140:	fce79ce3          	bne	a5,a4,1118 <main+0xac>
+    1144:	fd9ff06f          	j	111c <main+0xb0>
+    1148:	00266613          	ori	a2,a2,2
+    114c:	f95ff06f          	j	10e0 <main+0x74>
+    1150:	00100613          	li	a2,1
+    1154:	f65ff06f          	j	10b8 <main+0x4c>
+
+Disassembly of section .rodata:
+
+00001158 <test_done_ptr>:
+    1158:	3ff4                	.insn	2, 0x3ff4
+    115a:	2000                	.insn	2, 0x2000
+
+0000115c <test_result_ptr>:
+    115c:	3ff0                	.insn	2, 0x3ff0
+    115e:	2000                	.insn	2, 0x2000
+
+Disassembly of section .data:
+
+20000000 <init_array>:
+20000000:	1111                	.insn	2, 0x1111
+20000002:	1111                	.insn	2, 0x1111
+20000004:	2222                	.insn	2, 0x2222
+20000006:	2222                	.insn	2, 0x2222
+20000008:	33333333          	.insn	4, 0x33333333
+2000000c:	4444                	.insn	2, 0x4444
+2000000e:	4444                	.insn	2, 0x4444
+
+Disassembly of section .riscv.attributes:
+
+00000000 <.riscv.attributes>:
+   0:	1b41                	.insn	2, 0x1b41
+   2:	0000                	.insn	2, 0x0000
+   4:	7200                	.insn	2, 0x7200
+   6:	7369                	.insn	2, 0x7369
+   8:	01007663          	bgeu	zero,a6,14 <_stext-0xfec>
+   c:	0011                	.insn	2, 0x0011
+   e:	0000                	.insn	2, 0x0000
+  10:	1004                	.insn	2, 0x1004
+  12:	7205                	.insn	2, 0x7205
+  14:	3376                	.insn	2, 0x3376
+  16:	6932                	.insn	2, 0x6932
+  18:	7032                	.insn	2, 0x7032
+  1a:	0031                	.insn	2, 0x0031
+
+Disassembly of section .comment:
+
+00000000 <.comment>:
+   0:	3a434347          	.insn	4, 0x3a434347
+   4:	2820                	.insn	2, 0x2820
+   6:	33623167          	.insn	4, 0x33623167
+   a:	3630                	.insn	2, 0x3630
+   c:	3330                	.insn	2, 0x3330
+   e:	6139                	.insn	2, 0x6139
+  10:	2029                	.insn	2, 0x2029
+  12:	3531                	.insn	2, 0x3531
+  14:	312e                	.insn	2, 0x312e
+  16:	302e                	.insn	2, 0x302e
+	...

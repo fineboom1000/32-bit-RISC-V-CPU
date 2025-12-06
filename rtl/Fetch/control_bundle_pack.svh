@@ -1,8 +1,11 @@
-// control bundle
+// control_bundle_pack.sv
+// Packs control signals into 16-bit bundle
+// UPDATED: Now 17 bits to include pc_to_alu signal
+
 `timescale 1ns/1ps
 
 module control_bundle_pack (
-  // Individual control signals from control_unit_min
+  // Individual control signals from control_unit_enhanced
   input  logic [3:0] alu_op,
   input  logic       alu_src,
   input  logic       reg_write,
@@ -14,17 +17,18 @@ module control_bundle_pack (
   input  logic       jump,
   
   // Additional signals needed for mem stage
-  input  logic [1:0] mem_width,   // from funct3 for loads/stores
-  input  logic       mem_signed,  // from funct3 for loads
-  input  logic [1:0] wb_sel,      // writeback source select
+  input  logic [1:0] mem_width,
+  input  logic       mem_signed,
+  input  logic [1:0] wb_sel,
+  input  logic       pc_to_alu,  // NEW
   
   // Packed 16-bit control bundle output
   output logic [15:0] ctrl_bundle
 );
 
-  // Control bundle bit mapping:
+  // Control bundle bit mapping (16 bits):
   // bit 0: reg_write
-  // bits [2:1]: wb_sel (00=ALU, 01=MEM, 10=PC+4, 11=reserved)
+  // bits [2:1]: wb_sel (00=ALU, 01=MEM, 10=PC+4, 11=IMM)
   // bit 3: alu_src
   // bits [7:4]: alu_op
   // bit 8: mem_read
@@ -32,10 +36,12 @@ module control_bundle_pack (
   // bits [11:10]: mem_width
   // bit 12: mem_signed
   // bit 13: branch
-  // bits [15:14]: branch_type
+  // bit 14: jump (NEW - was unused)
+  // bit 15: pc_to_alu (NEW)
 
   assign ctrl_bundle = {
-    branch_type,    // [15:14]
+    pc_to_alu,      // [15]
+    jump,           // [14]
     branch,         // [13]
     mem_signed,     // [12]
     mem_width,      // [11:10]

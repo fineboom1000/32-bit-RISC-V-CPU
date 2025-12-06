@@ -43,10 +43,9 @@ module mem_stage #(
   output logic [31:0]   mem_branch_target
 );
 
- 
-  // Unpack control bundle (same bit layout as control_bundle_pack.svh)
+  // Unpack control bundle (same bit layout as control_bundle_pack)
   // bit 0: reg_write
-  // bits [2:1]: wb_sel (00=ALU, 01=MEM, 10=PC+4, 11=reserved)
+  // bits [2:1]: wb_sel (00=ALU, 01=MEM, 10=PC+4, 11=IMM)
   // bit 3: alu_src
   // bits [7:4]: alu_op
   // bit 8: mem_read
@@ -54,9 +53,9 @@ module mem_stage #(
   // bits [11:10]: mem_width
   // bit 12: mem_signed
   // bit 13: branch
-  // bits [15:14]: branch_type
+  // bit 14: jump
+  // bit 15: pc_to_alu
 
-  
   logic        ctrl_reg_write;
   logic [1:0]  ctrl_wb_sel;
   logic        ctrl_mem_read;
@@ -73,10 +72,7 @@ module mem_stage #(
     ctrl_mem_signed = mem_in_ctrl[12];
   end
 
-  
   // Drive data memory interface
-
-  
   assign mem_addr   = mem_in_alu_result;      // Address from ALU (base + offset)
   assign mem_wdata  = mem_in_rs2_for_store;   // Store data (forwarded rs2)
   assign mem_read   = ctrl_mem_read;
@@ -84,11 +80,7 @@ module mem_stage #(
   assign mem_width  = ctrl_mem_width;
   assign mem_signed = ctrl_mem_signed;
 
-
   // Load data processing: sign/zero extension
-  // data_mem.sv returns full 32-bit word, we extract byte/half as needed
-
-  
   logic [31:0] load_data_processed;
   logic [1:0]  byte_offset;
   
@@ -137,13 +129,15 @@ module mem_stage #(
     end
   end
 
+  // Extract immediate from instruction for LUI support
+  logic [31:0] imm_u;
+  assign imm_u = {mem_in_inst[31:12], 12'b0};
 
   // Writeback data selection based on wb_sel
-  // 00 = ALU result (arithmetic, logic, addresses for LUI/AUIPC)
+  // 00 = ALU result (arithmetic, logic, addresses for AUIPC)
   // 01 = Memory data (loads)
   // 10 = PC+4 (JAL/JALR return address)
-  // 11 = Reserved (could be used for immediate passthrough if needed)
- 
+  // 11 = Immediate (LUI - upper immediate)
   
   logic [31:0] wb_data_selected;
   
@@ -152,13 +146,12 @@ module mem_stage #(
       2'b00:   wb_data_selected = mem_in_alu_result;
       2'b01:   wb_data_selected = load_data_processed;
       2'b10:   wb_data_selected = mem_in_pc_plus4;
-      2'b11:   wb_data_selected = mem_in_alu_result;  // fallback
+      2'b11:   wb_data_selected = imm_u;  // LUI: use immediate directly
       default: wb_data_selected = mem_in_alu_result;
     endcase
   end
 
-
-  
+  // Outputs to MEM/WB register
   assign wb_out_rd        = mem_in_rd;
   assign wb_out_wdata     = wb_data_selected;
   assign wb_out_ctrl      = mem_in_ctrl;
@@ -166,8 +159,7 @@ module mem_stage #(
   assign wb_out_inst      = mem_in_inst;
   assign wb_out_valid     = mem_in_valid;
 
-
-  
+  // Branch/jump outputs
   assign mem_branch_taken  = mem_in_branch_taken;
   assign mem_branch_target = mem_in_branch_target;
 

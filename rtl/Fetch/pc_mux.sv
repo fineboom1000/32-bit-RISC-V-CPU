@@ -96,7 +96,7 @@ division by four is really a bit shift right, making us remove those bottom two 
 no word will ever end in 1,2,3. Only 0, so doing this forces it to be zero, while at the same time 
 making us count the bytes properly.
 
-*WARNING. To be clear, “No word will ever end in 1,2,3. Only 0” is NOT A STATEMENT YOU SHOULD GENERALIZE.
+*WARNING. To be clear, "No word will ever end in 1,2,3. Only 0" is NOT A STATEMENT YOU SHOULD GENERALIZE.
 It is only true for instruction memory, Instruction fetch is constrained; data memory is not.
 
 The key, word_index = PC[31:2] = PC / 4
@@ -105,12 +105,6 @@ but note this is a design choice.
 
 Now as for the index of however ROM counts, that is entirely up to you, depending on how you design your system.
 */
-
-
-
-
-*/
-
 
 `timescale 1ns/1ps
 
@@ -126,8 +120,6 @@ module pc_mux (
 endmodule
 
 /*
-
 A mux in hardware is just a conditional selection between two (or more) signals.
 In RTL, the cleanest, synthesizable way to express that is the code above...
-
 */

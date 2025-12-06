@@ -82,6 +82,7 @@ module decode #(
   logic [1:0]  mem_width;
   logic        mem_signed;
   logic [1:0]  wb_sel;
+  logic        pc_to_alu;
 
   // Instantiate enhanced control unit
   control_unit_enhanced cu (
@@ -99,7 +100,8 @@ module decode #(
     .jump(jump),
     .mem_width(mem_width),
     .mem_signed(mem_signed),
-    .wb_sel(wb_sel)
+    .wb_sel(wb_sel),
+    .pc_to_alu(pc_to_alu)
   );
 
   // Pack control signals into bundle
@@ -118,6 +120,7 @@ module decode #(
     .mem_width(mem_width),
     .mem_signed(mem_signed),
     .wb_sel(wb_sel),
+    .pc_to_alu(pc_to_alu),
     .ctrl_bundle(id_ctrl_bundle)
   );
 
@@ -128,7 +131,7 @@ module decode #(
   logic [CTRL_W-1:0] ex_ctrl_out;
 
   // ID->EX register
-  id_ex_reg_fixed #(
+  id_ex_reg #(
     .CTRL_W(CTRL_W)
   ) idex (
     .clk(clk),

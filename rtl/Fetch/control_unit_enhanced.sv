@@ -1,5 +1,5 @@
-
-// control_unit_min
+// control_unit_enhanced.sv
+// This file has been "enhanced" to support AUIPC, LUI, and JAL/JALR properly, from its minimal version previously.
 
 `timescale 1ns/1ps
 
@@ -22,7 +22,8 @@ module control_unit_enhanced (
   // Additional outputs for control bundle
   output logic [1:0] mem_width,
   output logic       mem_signed,
-  output logic [1:0] wb_sel
+  output logic [1:0] wb_sel,
+  output logic       pc_to_alu  // NEW: indicates PC should be ALU operand A
 );
 
   // ALU operation encodings (must match alu.sv)
@@ -37,6 +38,7 @@ module control_unit_enhanced (
     ALU_SLL  = 4'd7,
     ALU_SRL  = 4'd8,
     ALU_SRA  = 4'd9,
+    ALU_COPY_A = 4'd10,
     ALU_NOP  = 4'd15;
 
   // RISC-V opcodes
@@ -79,6 +81,7 @@ module control_unit_enhanced (
     mem_width   = 2'b10;  // default word
     mem_signed  = 1'b0;
     wb_sel      = WB_ALU;
+    pc_to_alu   = 1'b0;   // NEW: default to using rs1
 
     case (opcode)
       OPC_R_TYPE: begin
@@ -159,38 +162,48 @@ module control_unit_enhanced (
           3'b000: branch_type = BR_BEQ;
           3'b001: branch_type = BR_BNE;
           3'b100: branch_type = BR_BLT;
-          3'b111: branch_type = BR_BLTU;
+          3'b110: branch_type = BR_BLT;   // BGE - will invert in ex_stage
+          3'b111: branch_type = BR_BLTU;  // BGEU - will invert in ex_stage
+          3'b101: branch_type = BR_BLTU;  // BLTU
           default: branch_type = BR_BEQ;
         endcase
       end
 
       OPC_LUI: begin
+        // LUI: rd = imm (upper 20 bits already in imm_u)
+        // Use ALU to copy immediate (ALU_COPY_A with imm as operand)
         alu_src    = 1'b1;
         reg_write  = 1'b1;
-        alu_op     = ALU_ADD;  // ALU adds 0 + imm
-        wb_sel     = WB_ALU;
+        alu_op     = ALU_COPY_A;  // Copy operand A (which will be 0)
+        wb_sel     = WB_IMM;      // Use immediate directly for writeback
       end
 
       OPC_AUIPC: begin
-        alu_src    = 1'b1;
+        // AUIPC: rd = PC + imm
+        alu_src    = 1'b1;        // Use immediate as operand B
         reg_write  = 1'b1;
-        alu_op     = ALU_ADD;  // ALU adds PC + imm
+        alu_op     = ALU_ADD;     // Add PC + imm
         wb_sel     = WB_ALU;
+        pc_to_alu  = 1'b1;        // NEW: Use PC as ALU operand A
       end
 
       OPC_JAL: begin
+        // JAL: rd = PC+4, PC = PC + imm
         jump       = 1'b1;
         reg_write  = 1'b1;
         alu_op     = ALU_ADD;
-        wb_sel     = WB_PC4;  // rd = PC+4
+        alu_src    = 1'b1;        // For target calculation (not used in current design)
+        wb_sel     = WB_PC4;      // rd = PC+4
+        pc_to_alu  = 1'b1;        // For target calculation
       end
 
       OPC_JALR: begin
+        // JALR: rd = PC+4, PC = (rs1 + imm) & ~1
         jump       = 1'b1;
         reg_write  = 1'b1;
-        alu_src    = 1'b1;
-        alu_op     = ALU_ADD;
-        wb_sel     = WB_PC4;  // rd = PC+4
+        alu_src    = 1'b1;        // Use immediate
+        alu_op     = ALU_ADD;     // rs1 + imm (for target)
+        wb_sel     = WB_PC4;      // rd = PC+4
       end
 
       default: begin
