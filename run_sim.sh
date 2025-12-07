@@ -11,7 +11,7 @@ iverilog -g2012 -o cpu_sim \
   rtl/Fetch/imem.sv \
   rtl/Fetch/fetch_wiring.sv \
   rtl/Fetch/control_unit_enhanced.sv \
-  rtl/Fetch/control_bundle.svh \
+  rtl/Fetch/control_bundle_pack.svh \
   rtl/Decode/if_id_reg.sv \
   rtl/Decode/decode.sv \
   rtl/Decode/decode_fields_imms.sv \

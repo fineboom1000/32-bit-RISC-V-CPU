@@ -6,9 +6,8 @@ module cpu_top #(
   parameter CTRL_W = 16,
   parameter logic [31:0] ROM_BASE = 32'h0000_1000,
   parameter logic [31:0] RAM_BASE = 32'h2000_0000,
-  parameter string IMEM_FILE = "imem.hex",
   parameter int IMEM_WORDS = 4096,
-  parameter int DMEM_ADDR_WIDTH = 14  // 16KB
+  parameter int DMEM_ADDR_WIDTH = 14
 ) (
   input  logic clk,
   input  logic rst
@@ -61,9 +60,8 @@ module cpu_top #(
   // Instruction memory fetch wrapper
   fetch_wiring #(
     .ROM_BASE   (ROM_BASE),
-    .IMEM_FILE  (IMEM_FILE),
     .IMEM_WORDS (IMEM_WORDS),
-    .IMEM_SYNC  (1)
+    .IMEM_SYNC  (0)
   ) fetch (
     .clk            (clk),
     .imem_read_en   (1'b1),
@@ -73,7 +71,6 @@ module cpu_top #(
     .if_pc_plus4    (if_pc_plus4),
     .if_instruction (if_instruction)
   );
-
   
   // IF/ID PIPELINE REGISTER
   
@@ -193,7 +190,7 @@ module cpu_top #(
   assign stall_if = haz_stall;
   assign stall_id = haz_stall;
   assign flush_if = mem_branch_taken;
-  assign flush_id = mem_branch_taken | haz_flush_ifid;
+  assign flush_id = mem_branch_taken | haz_stall;
 
   
   // EX STAGE - Execute

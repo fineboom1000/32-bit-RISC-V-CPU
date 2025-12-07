@@ -1,4 +1,4 @@
-// linker_loader.sv - Icarus Verilog compatible version.................1.618033988
+// linker_loader.sv - FIXED
 `timescale 1ns/1ps
 
 module linker_loader #(
@@ -14,13 +14,10 @@ module linker_loader #(
   integer i;
   reg [31:0] imem_tmp [0:MAX_IMEM_WORDS-1];
   reg [7:0] dmem_tmp [0:MAX_DMEM_BYTES-1];
-  integer rom_word_base;
-  integer mem_index;
 
   initial begin
     $display("[linker_loader] ROM_ORIGIN = 0x%08h RAM_ORIGIN = 0x%08h", ROM_ORIGIN, RAM_ORIGIN);
 
-    // Load IMEM hex
     if ($test$plusargs("no_init_mem")) begin
       $display("[linker_loader] +no_init_mem set: skipping memory init");
     end else begin
@@ -34,16 +31,16 @@ module linker_loader #(
       end
 
       if (imem_len == 0) begin
-        $display("[linker_loader] Warning: imem hex read resulted in 0 words (file may be empty/missing).");
+        $display("[linker_loader] Warning: imem hex read resulted in 0 words");
       end else begin
         $display("[linker_loader] Read %0d imem words from %0s", imem_len, IMEM_HEX);
         
-        rom_word_base = ROM_ORIGIN >> 2;
+        // Copy to IMEM starting at index 0 (imem.sv handles address translation)
         for (i = 0; i < imem_len; i = i + 1) begin
-          cpu_top.fetch.imem_inst.mem[rom_word_base + i] = imem_tmp[i];
+          testbench.cpu.fetch.imem_inst.mem[i] = imem_tmp[i];
         end
         
-        $display("[linker_loader] imem word-copy completed to cpu_top.fetch.imem_inst.mem at word-base=0x%0h", ROM_ORIGIN>>2);
+        $display("[linker_loader] imem word-copy completed to testbench.cpu.fetch.imem_inst.mem[0:%0d]", imem_len-1);
       end
 
       // Load DMEM hex
@@ -55,16 +52,16 @@ module linker_loader #(
       end
       
       if (dmem_len == 0) begin
-        $display("[linker_loader] Warning: dmem hex read resulted in 0 bytes (file may be empty/missing).");
+        $display("[linker_loader] Warning: dmem hex read resulted in 0 bytes");
       end else begin
         $display("[linker_loader] Read %0d dmem bytes from %0s", dmem_len, DMEM_HEX);
         
+        // Copy to DMEM starting at index 0 (data_mem.sv handles address translation)
         for (i = 0; i < dmem_len; i = i + 1) begin
-          mem_index = i;
-          cpu_top.data_memory.mem_array[mem_index] = dmem_tmp[i];
+          testbench.cpu.data_memory.mem_array[i] = dmem_tmp[i];
         end
         
-        $display("[linker_loader] dmem byte-copy completed into cpu_top.data_memory.mem_array");
+        $display("[linker_loader] dmem byte-copy completed into testbench.cpu.data_memory.mem_array[0:%0d]", dmem_len-1);
       end
     end
   end

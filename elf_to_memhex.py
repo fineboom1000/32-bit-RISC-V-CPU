@@ -1,8 +1,4 @@
 #!/usr/bin/env python3
-# elf_to_memhex.py
-# Produce imem.hex (word-per-line, little-endian) and dmem.hex (byte-per-line)
-# from an ELF file. Requires pyelftools: pip install pyelftools
-
 import sys, argparse
 from elftools.elf.elffile import ELFFile
 
@@ -20,60 +16,56 @@ def main():
 
     with open(args.elf, "rb") as f:
         elf = ELFFile(f)
-        # aggregate all LOAD segments
-        imem_bytes = {}  # addr -> byte
+        all_bytes = {}
         for seg in elf.iter_segments():
             if seg['p_type'] != 'PT_LOAD':
                 continue
             vaddr = seg['p_vaddr']
             data = seg.data()
             for i, b in enumerate(data):
-                imem_bytes[vaddr + i] = b
+                all_bytes[vaddr + i] = b
 
-    # produce imem word lines starting at rom_origin up to highest address in text region
-    # find max addr
-    if not imem_bytes:
+    if not all_bytes:
         print("No loadable segments found in ELF")
         sys.exit(1)
-    min_addr = min(imem_bytes.keys())
-    max_addr = max(imem_bytes.keys())
+
+    min_addr = min(all_bytes.keys())
+    max_addr = max(all_bytes.keys())
     print(f"ELF loadable min=0x{min_addr:x} max=0x{max_addr:x}")
 
-    # imem: write words at addresses starting from rom_origin up to max_addr
-    start = rom_origin
-    end = max_addr
-    # align start to word
-    if start % 4 != 0:
-        start = start - (start % 4)
-    # also ensure end aligned up
-    if (end % 4) != 0:
-        end = end + (4 - (end % 4))
+    rom_bytes = {addr: all_bytes[addr] for addr in all_bytes if addr < ram_origin}
+    ram_bytes = {addr: all_bytes[addr] for addr in all_bytes if addr >= ram_origin}
 
-    with open(args.out_imem, "w") as imem_f:
-        for addr in range(start, end+1, 4):
-            # build little-endian word
-            w = 0
-            for i in range(4):
-                byte = imem_bytes.get(addr + i, 0)
-                w |= (byte << (8 * i))
-            imem_f.write("{:08x}\n".format(w))
+    if rom_bytes:
+        rom_min = min(rom_bytes.keys())
+        rom_max = max(rom_bytes.keys())
+        start = rom_min & ~3
+        end = (rom_max + 3) & ~3
+        
+        with open(args.out_imem, "w") as imem_f:
+            for addr in range(start, end, 4):
+                w = 0
+                for i in range(4):
+                    byte = rom_bytes.get(addr + i, 0)
+                    w |= (byte << (8 * i))
+                imem_f.write(f"{w:08x}\n")
+        
+        print(f"Wrote {(end - start) // 4} words to {args.out_imem}")
+    else:
+        open(args.out_imem, "w").close()
 
-    # dmem: include only bytes whose address is in RAM region
-    with open(args.out_dmem, "w") as dmem_f:
-        # find min and max in ram region
-        ram_addrs = [a for a in imem_bytes.keys() if a >= ram_origin]
-        if ram_addrs:
-            ram_min = min(ram_addrs)
-            ram_max = max(ram_addrs)
-            # write every byte from ram_origin up to ram_max
-            for addr in range(ram_origin, ram_max+1):
-                b = imem_bytes.get(addr, 0)
-                dmem_f.write("{:02x}\n".format(b))
-        else:
-            # nothing to write; create empty dmem
-            pass
-
-    print(f"Wrote {args.out_imem} and {args.out_dmem}")
+    if ram_bytes:
+        ram_min = min(ram_bytes.keys())
+        ram_max = max(ram_bytes.keys())
+        
+        with open(args.out_dmem, "w") as dmem_f:
+            for addr in range(ram_min, ram_max + 1):
+                b = ram_bytes.get(addr, 0)
+                dmem_f.write(f"{b:02x}\n")
+        
+        print(f"Wrote {ram_max - ram_min + 1} bytes to {args.out_dmem}")
+    else:
+        open(args.out_dmem, "w").close()
 
 if __name__ == "__main__":
     main()

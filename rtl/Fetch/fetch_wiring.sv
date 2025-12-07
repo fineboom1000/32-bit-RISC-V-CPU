@@ -9,11 +9,11 @@
 
 //fetch_wiring
 
+// fetch_wiring.sv
 `timescale 1ns/1ps
 
 module fetch_wiring #(
   parameter logic [31:0] ROM_BASE = 32'h0000_1000,
-  parameter string IMEM_FILE = "imem.hex",
   parameter int IMEM_WORDS = 4096,
   parameter bit IMEM_SYNC = 1
 ) (
@@ -29,7 +29,6 @@ module fetch_wiring #(
 
   // instantiate instruction memory
   imem #(
-    .MEMFILE(IMEM_FILE),
     .ROM_BASE(ROM_BASE),
     .WORDS(IMEM_WORDS),
     .SYNC(IMEM_SYNC)

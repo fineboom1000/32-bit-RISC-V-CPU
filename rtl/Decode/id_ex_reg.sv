@@ -41,7 +41,7 @@ module id_ex_reg #(
   logic [4:0]  rs1_r, rs2_r, rd_r;
   logic [CTRL_W-1:0] ctrl_r;
 
-  always_ff @(posedge clk) begin
+always_ff @(posedge clk) begin
     if (rst) begin
       pc_r         <= 32'd0;
       pc_plus4_r   <= 32'd0;
@@ -51,13 +51,11 @@ module id_ex_reg #(
       rs1_r        <= 5'd0;
       rs2_r        <= 5'd0;
       rd_r         <= 5'd0;
-      instr_r      <= 32'h0000_0013;  // NOP :)
+      instr_r      <= 32'h0000_0013;
       ctrl_r       <= {CTRL_W{1'b0}};
     end else begin
-      if (stall_id) begin
-        // hold: do nothing
-      end else if (flush_ex) begin
-        // inject NOP into EX: clear control, keep PC for debug, but it is not needed
+      if (stall_id || flush_ex) begin  // <-- Changed this line
+        // inject NOP into EX when stalling ID or flushing
         pc_r         <= id_pc;
         pc_plus4_r   <= id_pc_plus4;
         rs1v_r       <= 32'd0;
@@ -66,7 +64,7 @@ module id_ex_reg #(
         rs1_r        <= 5'd0;
         rs2_r        <= 5'd0;
         rd_r         <= 5'd0;
-        instr_r      <= 32'h0000_0013;  // NOP
+        instr_r      <= 32'h0000_0013;
         ctrl_r       <= {CTRL_W{1'b0}};
       end else begin
         // normal capture
@@ -83,6 +81,7 @@ module id_ex_reg #(
       end
     end
   end
+  
 
   // outputs
   assign ex_pc         = pc_r;
