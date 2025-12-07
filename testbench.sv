@@ -4,10 +4,8 @@ module testbench;
   logic clk = 0;
   logic rst = 1;
   
-  // Clock generation (10ns period = 100MHz)
   always #5 clk = ~clk;
   
-  // CPU instance
   cpu_top #(
     .ROM_BASE(32'h0000_1000),
     .RAM_BASE(32'h2000_0000),
@@ -18,7 +16,6 @@ module testbench;
     .rst(rst)
   );
   
-  // Loader instance
   linker_loader #(
     .IMEM_HEX("imem.hex"),
     .DMEM_HEX("dmem.hex"),
@@ -26,24 +23,17 @@ module testbench;
     .RAM_ORIGIN(32'h2000_0000)
   ) loader ();
   
-  // Test result monitoring
   localparam TEST_RESULT_ADDR = 32'h2000_3FF0;
   localparam TEST_DONE_ADDR   = 32'h2000_3FF4;
-  
   localparam TEST_RESULT_IDX = TEST_RESULT_ADDR - 32'h2000_0000;
   localparam TEST_DONE_IDX   = TEST_DONE_ADDR - 32'h2000_0000;
   
   logic [31:0] test_result;
   logic test_done;
-  
   integer cycle_count = 0;
-  logic [31:0] last_pc;
-  integer stuck_count = 0;
   
-  // Decode instruction type for debug
   function string decode_instr(logic [31:0] instr);
-    logic [6:0] opcode;
-    opcode = instr[6:0];
+    logic [6:0] opcode = instr[6:0];
     case (opcode)
       7'b0110111: return "LUI";
       7'b0010111: return "AUIPC";
@@ -58,47 +48,98 @@ module testbench;
     endcase
   endfunction
   
-  // Cycle counter and detailed debug
+  function string decode_reg(logic [4:0] reg_num);
+    case (reg_num)
+      5'd0:  return "x0/zero";
+      5'd1:  return "x1/ra";
+      5'd2:  return "x2/sp";
+      5'd5:  return "x5/t0";
+      5'd6:  return "x6/t1";
+      5'd7:  return "x7/t2";
+      5'd10: return "x10/a0";
+      5'd28: return "x28/t3";
+      default: return $sformatf("x%0d", reg_num);
+    endcase
+  endfunction
+  
+  // Detailed tracking for critical startup instructions
   always @(posedge clk) begin
     if (!rst) begin
       cycle_count <= cycle_count + 1;
       
-      // Detect if PC is stuck in a small loop
-      if (cpu.pc_current == last_pc) begin
-        stuck_count <= stuck_count + 1;
-      end else begin
-        stuck_count <= 0;
-      end
-      last_pc <= cpu.pc_current;
-      
-      // Print register writes
+      // Track all register writes with source info
       if (cpu.rf_wen && cpu.rf_waddr != 5'd0) begin
-        $display("Cycle %0d: WB WRITE x%0d <= 0x%08h (PC was 0x%08h)", 
-                 cycle_count, cpu.rf_waddr, cpu.rf_wdata, cpu.memwb_pc_plus4 - 32'd4);
+        $display("Cycle %0d: WB WRITE %s <= 0x%08h (from PC 0x%08h)", 
+                 cycle_count, decode_reg(cpu.rf_waddr), cpu.rf_wdata, 
+                 cpu.memwb_pc_plus4 - 32'd4);
       end
       
-      // Print memory writes
+      // DETAILED TRACKING for PC range 0x1000-0x1020 (startup code)
+      if (cpu.pc_current >= 32'h1000 && cpu.pc_current <= 32'h1020) begin
+        $display("\n=== STARTUP DETAIL: Cycle %0d, PC=0x%08h [%s] ===", 
+                 cycle_count, cpu.pc_current, decode_instr(cpu.if_instruction));
+        $display("  Instruction: 0x%08h", cpu.if_instruction);
+        
+        // Show current register state for t0, t1, t2, sp
+        $display("  Current Regs: t0(x5)=0x%08h t1(x6)=0x%08h t2(x7)=0x%08h sp(x2)=0x%08h",
+                 cpu.regfile_inst.regs[5], cpu.regfile_inst.regs[6],
+                 cpu.regfile_inst.regs[7], cpu.regfile_inst.regs[2]);
+        
+        // Show ID/EX stage values (what's being decoded)
+        $display("  ID stage: rs1=%s(0x%08h) rs2=%s(0x%08h) rd=%s imm=0x%08h",
+                 decode_reg(cpu.rf_raddr1), cpu.rf_rdata1,
+                 decode_reg(cpu.rf_raddr2), cpu.rf_rdata2,
+                 decode_reg(cpu.idex_rd), cpu.idex_imm);
+        
+        // Show EX stage computation
+        if (cpu.ex_out_valid) begin
+          $display("  EX stage: ALU result=0x%08h rs2_data=0x%08h (for store)",
+                   cpu.ex_out_alu_result, cpu.ex_out_rs2_for_store);
+        end
+      end
+      
+      // CRITICAL: Track the problematic store at PC 0x1008
+      if (cpu.pc_current == 32'h1008) begin
+        $display("\n!!! CRITICAL INSTRUCTION AT 0x1008: sw sp,0(t0) !!!");
+        $display("  Expected: Store SP value to address in t0");
+        $display("  t0(x5) = 0x%08h (should be ~0x20000010)", cpu.regfile_inst.regs[5]);
+        $display("  sp(x2) = 0x%08h", cpu.regfile_inst.regs[2]);
+        $display("  ID/EX.rs1_val (base addr) = 0x%08h", cpu.idex_rs1_val);
+        $display("  ID/EX.rs2_val (store data) = 0x%08h", cpu.idex_rs2_val);
+        $display("  ID/EX.imm (offset) = 0x%08h", cpu.idex_imm);
+      end
+      
+      // Track memory operations with register context
       if (cpu.dmem_write && !rst) begin
-        $display("Cycle %0d: MEM WRITE addr=0x%08h data=0x%08h width=%0d", 
-                 cycle_count, cpu.dmem_addr, cpu.dmem_wdata, cpu.dmem_width);
+        logic [31:0] offset = cpu.dmem_addr - 32'h20000000;
+        $display("Cycle %0d: *** MEMORY WRITE ***", cycle_count);
+        $display("  Address: 0x%08h (RAM offset=0x%x)", cpu.dmem_addr, offset);
+        $display("  Data: 0x%08h", cpu.dmem_wdata);
+        $display("  Width: %0d", cpu.dmem_width);
+        $display("  From PC: 0x%08h", cpu.exmem_pc_plus4 - 32'd4);
+        $display("  Current t0(x5)=0x%08h sp(x2)=0x%08h", 
+                 cpu.regfile_inst.regs[5], cpu.regfile_inst.regs[2]);
       end
       
-      // Print detailed info for first 150 cycles or when interesting things happen
-      if (cycle_count < 150 || cpu.mem_branch_taken || stuck_count == 10) begin
-        $display("Cycle %0d: PC=0x%08h [%s], Instr=0x%08h, Branch=%b, Target=0x%08h, x1=0x%08h, x2=0x%08h, x10=0x%08h", 
-                 cycle_count, cpu.pc_current, decode_instr(cpu.if_instruction),
-                 cpu.if_instruction, cpu.mem_branch_taken, cpu.mem_branch_target,
-                 cpu.regfile_inst.regs[1], cpu.regfile_inst.regs[2], cpu.regfile_inst.regs[10]);
+      if (cpu.dmem_read && !rst) begin
+        logic [31:0] offset = cpu.dmem_addr - 32'h20000000;
+        $display("Cycle %0d: *** MEMORY READ ***", cycle_count);
+        $display("  Address: 0x%08h (RAM offset=0x%x)", cpu.dmem_addr, offset);
+        $display("  Data: 0x%08h", cpu.dmem_rdata);
+        $display("  From PC: 0x%08h", cpu.exmem_pc_plus4 - 32'd4);
       end
       
-      // Warn if stuck in tight loop
-      if (stuck_count == 10) begin
-        $display("WARNING: PC stuck at 0x%08h for 10 cycles!", cpu.pc_current);
-        $display("  Instruction: 0x%08h [%s]", cpu.if_instruction, decode_instr(cpu.if_instruction));
-        $display("  Branch taken: %b, Target: 0x%08h", cpu.mem_branch_taken, cpu.mem_branch_target);
+      // Show forwarding activity
+      if (cpu.fwd_mem_valid) begin
+        $display("  [FWD] MEM->EX: %s <= 0x%08h", 
+                 decode_reg(cpu.fwd_mem_rd), cpu.fwd_mem_data);
+      end
+      if (cpu.fwd_wb_valid) begin
+        $display("  [FWD] WB->EX: %s <= 0x%08h", 
+                 decode_reg(cpu.fwd_wb_rd), cpu.fwd_wb_data);
       end
       
-      // Check for test completion (check more frequently)
+      // Check for test completion
       test_done = (cpu.data_memory.mem_array[TEST_DONE_IDX + 0] != 8'd0) ||
                   (cpu.data_memory.mem_array[TEST_DONE_IDX + 1] != 8'd0) ||
                   (cpu.data_memory.mem_array[TEST_DONE_IDX + 2] != 8'd0) ||
@@ -113,51 +154,43 @@ module testbench;
         };
         
         $display("\n========================================");
-        $display("TEST COMPLETED at cycle %0d (time %0t ns)", cycle_count, $time);
+        $display("TEST COMPLETED at cycle %0d", cycle_count);
         $display("========================================");
         $display("Test Result: 0x%08h", test_result);
         
         if (test_result == 32'd0) begin
           $display("✓ ALL TESTS PASSED!");
-          $display("  - .data section copied correctly");
-          $display("  - .bss section zeroed correctly");
-          $display("  - Stack pointer initialized correctly");
-          $display("  - RAM read/write working");
         end else begin
           $display("✗ TESTS FAILED:");
-          if (test_result[0]) $display("  - .data section incorrect");
-          if (test_result[1]) $display("  - .bss section not zeroed");
-          if (test_result[2]) $display("  - Stack pointer mismatch");
-          if (test_result[3]) $display("  - RAM read/write failed");
+          if (test_result[0]) $display("  - Bit 0: .data section incorrect");
+          if (test_result[1]) $display("  - Bit 1: .bss section not zeroed");
+          if (test_result[2]) $display("  - Bit 2: Stack pointer mismatch");
+          if (test_result[3]) $display("  - Bit 3: RAM read/write failed");
+          
+          $display("\nFinal .data section:");
+          for (int i = 0; i < 4; i++) begin
+            $display("  [%0d] @ 0x%08h: 0x%02h%02h%02h%02h", 
+                     i, 32'h20000000 + i*4,
+                     cpu.data_memory.mem_array[i*4 + 3],
+                     cpu.data_memory.mem_array[i*4 + 2],
+                     cpu.data_memory.mem_array[i*4 + 1],
+                     cpu.data_memory.mem_array[i*4 + 0]);
+          end
         end
-        $display("========================================\n");
         
+        $display("========================================\n");
         #100 $finish;
       end
       
-      // Check if stuck in infinite loop at 0x1068 (the post-main loop)
-      if (cycle_count > 100 && cpu.pc_current == 32'h00001068) begin
-        $display("\n========================================");
-        $display("ERROR: CPU stuck in post-main infinite loop at 0x00001068");
-        $display("This means main() was never properly executed or exited prematurely");
-        $display("========================================");
-        $display("Register dump:");
-        for (int i = 0; i < 32; i = i + 1) begin
-          if (i % 4 == 0) $write("  ");
-          $write("x%0d=0x%08h ", i, cpu.regfile_inst.regs[i]);
-          if (i % 4 == 3) $write("\n");
-        end
-        $display("\nTest result memory:");
-        $display("  TEST_DONE   @ 0x%08h: 0x%02h", TEST_DONE_ADDR, 
-                 cpu.data_memory.mem_array[TEST_DONE_IDX]);
-        $display("  TEST_RESULT @ 0x%08h: 0x%08h", TEST_RESULT_ADDR, test_result);
-        $display("========================================\n");
+      // Stop after reasonable cycles
+      if (cycle_count > 150) begin
+        $display("\n!!! Stopping early at cycle 150 for analysis !!!");
+        $display("Check the detailed output above\n");
         #100 $finish;
       end
     end
   end
   
-  // Timeout (reduced to 2000 cycles for faster debug)
   initial begin
     $dumpfile("cpu_test.vcd");
     $dumpvars(0, testbench);
@@ -165,15 +198,13 @@ module testbench;
     rst = 1;
     #50;
     rst = 0;
-    $display("CPU reset released at time %0t", $time);
+    $display("========================================");
+    $display("DETAILED DEBUG TRACE - STARTUP CODE");
+    $display("========================================");
+    $display("Watching PC range 0x1000-0x1020 closely\n");
     
-    // Wait for timeout
-    #20000;  // 2000 cycles
-    $display("\n========================================");
-    $display("ERROR: Test timeout after 2000 cycles (cycle %0d)", cycle_count);
-    $display("Final PC: 0x%08h", cpu.pc_current);
-    $display("Final Instruction: 0x%08h", cpu.if_instruction);
-    $display("========================================\n");
+    #5000;
+    $display("\nTimeout - check output above");
     $finish;
   end
   

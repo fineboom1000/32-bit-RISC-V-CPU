@@ -173,15 +173,18 @@ module cpu_top #(
   logic haz_stall;
   logic haz_flush_ifid;
   logic idex_mem_read;
+  logic idex_reg_write;  
   
-  // Extract mem_read from control bundle
+  // Extract mem_read and reg_write from control bundle
   assign idex_mem_read = idex_ctrl[8];
+  assign idex_reg_write = idex_ctrl[0];  
   
   hazard_unit hazard (
     .haz_id_rs1      (rf_raddr1),
     .haz_id_rs2      (rf_raddr2),
     .haz_ex_mem_read (idex_mem_read),
     .haz_ex_rd       (idex_rd),
+    .haz_ex_reg_write(idex_reg_write), 
     .haz_stall       (haz_stall),
     .haz_flush_ifid  (haz_flush_ifid)
   );
