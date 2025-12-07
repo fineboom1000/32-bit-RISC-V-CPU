@@ -1,4 +1,4 @@
-// cpu_top.sv - COMPLETE WORKING VERSION
+// cpu_top.sv - FIXED VERSION with proper branch flushing
 // 5-stage pipelined RISC-V CPU with hazard detection and forwarding
 `timescale 1ns/1ps
 
@@ -24,13 +24,13 @@ module cpu_top #(
   logic [31:0] if_pc_plus4;
   logic [31:0] if_instruction;
   
-  // Branch/jump control from MEM stage
+  // Branch/jump control from MEM stage (keep original names for testbench)
   logic        mem_branch_taken;
   logic [31:0] mem_branch_target;
   
   // Stall/flush control
   logic        stall_if, stall_id;
-  logic        flush_if, flush_id;
+  logic        flush_if, flush_id, flush_ex;
   
   // PC+4 adder
   pc_plus4 pc_adder (
@@ -139,7 +139,7 @@ module cpu_top #(
     .clk         (clk),
     .rst         (rst),
     .stall_id    (stall_id),
-    .flush_id    (flush_id),
+    .flush_id    (flush_ex),  // FIXED: flush ID when branch taken
     
     .id_instr    (id_instr),
     .id_pc       (id_pc),
@@ -187,10 +187,12 @@ module cpu_top #(
   );
   
   // Stall and flush control
+  // FIXED: Proper branch flush logic
   assign stall_if = haz_stall;
   assign stall_id = haz_stall;
-  assign flush_if = mem_branch_taken;
-  assign flush_id = mem_branch_taken | haz_stall;
+  assign flush_if = mem_branch_taken;  // flush IF when branch taken
+  assign flush_id = mem_branch_taken;  // flush ID when branch taken
+  assign flush_ex = mem_branch_taken;  // flush EX when branch taken
 
   
   // EX STAGE - Execute
@@ -251,6 +253,10 @@ module cpu_top #(
     .ex_out_valid          (ex_out_valid)
   );
 
+  // Connect branch signals directly from EX stage (combinational)
+  assign mem_branch_taken  = ex_out_branch_taken;
+  assign mem_branch_target = ex_out_branch_target;
+
   
   // EX/MEM PIPELINE REGISTER
   
@@ -271,7 +277,7 @@ module cpu_top #(
     .clk                  (clk),
     .rst                  (rst),
     .stall_ex             (1'b0),
-    .flush_ex             (1'b0),
+    .flush_ex             (mem_branch_taken),  // flush when branch taken
     
     .mem_in_alu_result    (ex_out_alu_result),
     .mem_in_rs2_for_store (ex_out_rs2_for_store),
@@ -293,10 +299,6 @@ module cpu_top #(
     .mem_out_inst          (exmem_inst),
     .mem_out_valid         (exmem_valid)
   );
-  
-  // Connect branch signals for PC control
-  assign mem_branch_taken  = exmem_branch_taken;
-  assign mem_branch_target = exmem_branch_target;
 
   
   // MEM STAGE - Memory Access
@@ -352,7 +354,7 @@ module cpu_top #(
     .wb_out_inst      (memwb_in_inst),
     .wb_out_valid     (memwb_in_valid),
     
-    .mem_branch_taken  (),  // Already connected above
+    .mem_branch_taken  (),  // not used - branch resolved in EX stage
     .mem_branch_target ()
   );
   

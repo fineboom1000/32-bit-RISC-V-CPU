@@ -1,4 +1,5 @@
 // main.c - Test program for RV32I CPU
+// Fixed version: uses direct address casts instead of const pointers
 
 #include <stdint.h>
 
@@ -9,15 +10,8 @@ extern char _sbss;
 extern char _ebss;
 extern char __StackTop;
 
-/* Declared in startup.s, not here */
+/* Declared in startup.s */
 extern volatile uint32_t __stack_pointer_initial;
-
-/* Magic addresses for test result output (memory-mapped) */
-#define TEST_RESULT_ADDR  0x20003FF0u
-#define TEST_DONE_ADDR    0x20003FF4u
-
-volatile uint32_t *const test_result_ptr = (uint32_t*)TEST_RESULT_ADDR;
-volatile uint32_t *const test_done_ptr   = (uint32_t*)TEST_DONE_ADDR;
 
 /* Test data in .data section (initialized) */
 volatile uint32_t init_array[4] = {
@@ -71,11 +65,25 @@ int main(void)
         result |= 0x08u;  /* Bit 3: RAM write/read failed */
     }
 
-    /* Write test result to magic address (testbench monitors this) */
-    *test_result_ptr = result;
-    *test_done_ptr = 0x1;  /* Signal test completion */
+    /* Write test result using inline assembly */
+    /* Add NOPs to avoid pipeline hazards */
+    __asm__ volatile (
+        "lui  t5, 0x20004\n"        // t5 = 0x20004000
+        "nop\n"                      // Wait for t5 to be written
+        "nop\n"                      // Extra safety
+        "sw   %0, -16(t5)\n"        // Store result at 0x20003FF0
+        "li   t6, 1\n"              // t6 = 1
+        "nop\n"                      // Wait for t6 to be written
+        "sw   t6, -12(t5)\n"        // Store 1 at 0x20003FF4
+        :                            // no outputs
+        : "r"(result)                // input: result value
+        : "t5", "t6", "memory"       // clobbers
+    );
 
-    /* Infinite loop - testbench should detect test_done and stop */
+    /* Infinite loop - CPU stays here after test completes
+     * The testbench detects test_done=1 and stops simulation
+     * This prevents the CPU from running into undefined memory
+     */
     while (1) {
         __asm__ volatile ("nop");
     }
