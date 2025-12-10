@@ -1,5 +1,6 @@
-// cpu_top.sv - FIXED VERSION with proper branch flushing
-// 5-stage pipelined RISC-V CPU with hazard detection and forwarding
+// cpu_top.sv modified for fpga synthesis
+// fixed removed internal data_mem instance
+// data memory now handled externally in arty_s7_top
 `timescale 1ns/1ps
 
 module cpu_top #(
@@ -10,13 +11,20 @@ module cpu_top #(
   parameter int DMEM_ADDR_WIDTH = 14
 ) (
   input  logic clk,
-  input  logic rst
+  input  logic rst,
+  
+  // expose data memory interface for external ram and gpio
+  output logic [31:0] dmem_addr_out,
+  output logic [31:0] dmem_wdata_out,
+  output logic        dmem_read_out,
+  output logic        dmem_write_out,
+  output logic [1:0]  dmem_width_out,
+  output logic        dmem_signed_out,
+  input  logic [31:0] dmem_rdata_in,
+  input  logic        dmem_ready_in
 );
 
- 
-  // IF STAGE - Instruction Fetch
-  
-  
+  // if stage signals
   logic [31:0] pc_current;
   logic [31:0] pc_next;
   logic [31:0] pc_plus4_out;
@@ -24,21 +32,17 @@ module cpu_top #(
   logic [31:0] if_pc_plus4;
   logic [31:0] if_instruction;
   
-  // Branch/jump control from MEM stage (keep original names for testbench)
   logic        mem_branch_taken;
   logic [31:0] mem_branch_target;
   
-  // Stall/flush control
   logic        stall_if, stall_id;
   logic        flush_if, flush_id, flush_ex;
   
-  // PC+4 adder
   pc_plus4 pc_adder (
     .pc_in  (pc_current),
     .pc_out (pc_plus4_out)
   );
   
-  // PC mux (branch vs sequential)
   pc_mux pc_mux_inst (
     .pc_plus4      (pc_plus4_out),
     .branch_target (mem_branch_target),
@@ -46,7 +50,6 @@ module cpu_top #(
     .pc_next       (pc_next)
   );
   
-  // PC register
   pc_reg #(
     .RESET_VECTOR(ROM_BASE)
   ) pc_register (
@@ -57,7 +60,6 @@ module cpu_top #(
     .pc_current (pc_current)
   );
   
-  // Instruction memory fetch wrapper
   fetch_wiring #(
     .ROM_BASE   (ROM_BASE),
     .IMEM_WORDS (IMEM_WORDS),
@@ -72,9 +74,7 @@ module cpu_top #(
     .if_instruction (if_instruction)
   );
   
-  // IF/ID PIPELINE REGISTER
-  
-  
+  // if id pipeline register
   logic [31:0] id_pc;
   logic [31:0] id_pc_plus4;
   logic [31:0] id_instr;
@@ -95,19 +95,13 @@ module cpu_top #(
     .id_instr       (id_instr)
   );
 
-  
-  // ID STAGE - Instruction Decode
- 
-
-  
-  // Register file signals
+  // id stage signals
   logic [4:0]  rf_raddr1, rf_raddr2;
   logic [31:0] rf_rdata1, rf_rdata2;
   logic        rf_wen;
   logic [4:0]  rf_waddr;
   logic [31:0] rf_wdata;
   
-  // Decode outputs to ID/EX
   logic [31:0] idex_pc;
   logic [31:0] idex_pc_plus4;
   logic [31:0] idex_rs1_val;
@@ -119,7 +113,6 @@ module cpu_top #(
   logic [31:0] idex_instr;
   logic [CTRL_W-1:0] idex_ctrl;
   
-  // Register file
   regfile regfile_inst (
     .clk    (clk),
     .rst    (rst),
@@ -132,14 +125,13 @@ module cpu_top #(
     .rdata2 (rf_rdata2)
   );
   
-  // Decode stage (includes control unit, immediate gen, and ID/EX register)
   decode #(
     .CTRL_W(CTRL_W)
   ) decode_stage (
     .clk         (clk),
     .rst         (rst),
     .stall_id    (stall_id),
-    .flush_id    (flush_ex),  // FIXED: flush ID when branch taken
+    .flush_id    (flush_ex),
     
     .id_instr    (id_instr),
     .id_pc       (id_pc),
@@ -166,16 +158,12 @@ module cpu_top #(
     .idex_ctrl       (idex_ctrl)
   );
 
-  
-  // HAZARD DETECTION UNIT
-  
-  
+  // hazard detection unit
   logic haz_stall;
   logic haz_flush_ifid;
   logic idex_mem_read;
   logic idex_reg_write;  
   
-  // Extract mem_read and reg_write from control bundle
   assign idex_mem_read = idex_ctrl[8];
   assign idex_reg_write = idex_ctrl[0];  
   
@@ -189,19 +177,13 @@ module cpu_top #(
     .haz_flush_ifid  (haz_flush_ifid)
   );
   
-  // Stall and flush control
-  // FIXED: Proper branch flush logic
   assign stall_if = haz_stall;
   assign stall_id = haz_stall;
-  assign flush_if = mem_branch_taken;  // flush IF when branch taken
-  assign flush_id = mem_branch_taken;  // flush ID when branch taken
-  assign flush_ex = mem_branch_taken;  // flush EX when branch taken
+  assign flush_if = mem_branch_taken;
+  assign flush_id = mem_branch_taken;
+  assign flush_ex = mem_branch_taken;
 
-  
-  // EX STAGE - Execute
-  
-  
-  // Forwarding signals
+  // ex stage signals
   logic [31:0] fwd_mem_data;
   logic [4:0]  fwd_mem_rd;
   logic        fwd_mem_valid;
@@ -209,7 +191,6 @@ module cpu_top #(
   logic [4:0]  fwd_wb_rd;
   logic        fwd_wb_valid;
   
-  // EX stage outputs
   logic [31:0] ex_out_alu_result;
   logic [31:0] ex_out_rs2_for_store;
   logic [4:0]  ex_out_rd;
@@ -236,7 +217,7 @@ module cpu_top #(
     .ex_in_rd          (idex_rd),
     .ex_in_instr       (idex_instr),
     .ex_in_ctrl        (idex_ctrl),
-    .ex_in_valid       (1'b1),  // Simple model: always valid unless NOP
+    .ex_in_valid       (1'b1),
     
     .fwd_mem_data      (fwd_mem_data),
     .fwd_mem_rd        (fwd_mem_rd),
@@ -256,14 +237,10 @@ module cpu_top #(
     .ex_out_valid          (ex_out_valid)
   );
 
-  // Connect branch signals directly from EX stage (combinational)
   assign mem_branch_taken  = ex_out_branch_taken;
   assign mem_branch_target = ex_out_branch_target;
 
-  
-  // EX/MEM PIPELINE REGISTER
-  
-  
+  // ex mem pipeline register
   logic [31:0] exmem_alu_result;
   logic [31:0] exmem_rs2_for_store;
   logic [4:0]  exmem_rd;
@@ -280,7 +257,7 @@ module cpu_top #(
     .clk                  (clk),
     .rst                  (rst),
     .stall_ex             (1'b0),
-    .flush_ex             (mem_branch_taken),  // flush when branch taken
+    .flush_ex             (mem_branch_taken),
     
     .mem_in_alu_result    (ex_out_alu_result),
     .mem_in_rs2_for_store (ex_out_rs2_for_store),
@@ -303,21 +280,7 @@ module cpu_top #(
     .mem_out_valid         (exmem_valid)
   );
 
-  
-  // MEM STAGE - Memory Access
-  
-  
-  // Data memory interface
-  logic [31:0] dmem_addr;
-  logic [31:0] dmem_wdata;
-  logic        dmem_read;
-  logic        dmem_write;
-  logic [1:0]  dmem_width;
-  logic        dmem_signed;
-  logic [31:0] dmem_rdata;
-  logic        dmem_ready;
-  
-  // MEM stage outputs to WB
+  // mem stage signals
   logic [4:0]  memwb_in_rd;
   logic [31:0] memwb_in_wdata;
   logic [CTRL_W-1:0] memwb_in_ctrl;
@@ -341,14 +304,14 @@ module cpu_top #(
     .mem_in_inst          (exmem_inst),
     .mem_in_valid         (exmem_valid),
     
-    .mem_addr    (dmem_addr),
-    .mem_wdata   (dmem_wdata),
-    .mem_read    (dmem_read),
-    .mem_write   (dmem_write),
-    .mem_width   (dmem_width),
-    .mem_signed  (dmem_signed),
-    .mem_rdata   (dmem_rdata),
-    .mem_ready   (dmem_ready),
+    .mem_addr    (dmem_addr_out),
+    .mem_wdata   (dmem_wdata_out),
+    .mem_read    (dmem_read_out),
+    .mem_write   (dmem_write_out),
+    .mem_width   (dmem_width_out),
+    .mem_signed  (dmem_signed_out),
+    .mem_rdata   (dmem_rdata_in),
+    .mem_ready   (dmem_ready_in),
     
     .wb_out_rd        (memwb_in_rd),
     .wb_out_wdata     (memwb_in_wdata),
@@ -357,31 +320,14 @@ module cpu_top #(
     .wb_out_inst      (memwb_in_inst),
     .wb_out_valid     (memwb_in_valid),
     
-    .mem_branch_taken  (),  // not used - branch resolved in EX stage
+    .mem_branch_taken  (),
     .mem_branch_target ()
   );
-  
-  // Data memory
-  data_mem #(
-    .ADDR_WIDTH (DMEM_ADDR_WIDTH),
-    .RAM_BASE   (RAM_BASE)
-  ) data_memory (
-    .clk        (clk),
-    .rst        (rst),
-    .mem_addr   (dmem_addr),
-    .mem_wdata  (dmem_wdata),
-    .mem_read   (dmem_read),
-    .mem_write  (dmem_write),
-    .mem_width  (dmem_width),
-    .mem_signed (dmem_signed),
-    .mem_rdata  (dmem_rdata),
-    .mem_ready  (dmem_ready)
-  );
 
-  
-  // MEM/WB PIPELINE REGISTER
-  
-  
+  // removed data_mem instance
+  // data memory now handled externally in arty_s7_top
+
+  // mem wb pipeline register
   logic [4:0]  memwb_rd;
   logic [31:0] memwb_wdata;
   logic [CTRL_W-1:0] memwb_ctrl;
@@ -412,10 +358,7 @@ module cpu_top #(
     .wb_out_valid   (memwb_valid)
   );
 
-
-  // WB STAGE - Writeback
- 
-  
+  // wb stage
   wb_stage #(
     .CTRL_W(CTRL_W)
   ) writeback (
@@ -429,11 +372,7 @@ module cpu_top #(
     .wb_wdata     (rf_wdata)
   );
 
-  
-  // FORWARDING UNIT
-  
-  
-  // MEM stage forwarding candidate (from MEM/WB register output)
+  // forwarding unit
   logic memwb_reg_write;
   assign memwb_reg_write = memwb_ctrl[0] & memwb_valid;
   
@@ -454,34 +393,5 @@ module cpu_top #(
     .fwd_wb_rd     (fwd_wb_rd),
     .fwd_wb_valid  (fwd_wb_valid)
   );
-
-  
-  // DEBUG OUTPUT (optional, comment out for synthesis)
- 
-  `ifdef SIM_DEBUG
-  always @(posedge clk) begin
-    if (!rst) begin
-      $display("PC=0x%08h | IF=0x%08h | ID=0x%08h | EX=0x%08h | MEM=0x%08h | WB=0x%08h",
-               pc_current, if_instruction, id_instr, idex_instr, exmem_inst, memwb_inst);
-      
-      if (rf_wen) begin
-        $display("  WB: x%0d <= 0x%08h", rf_waddr, rf_wdata);
-      end
-      
-      if (dmem_write) begin
-        $display("  MEM Write: addr=0x%08h data=0x%08h width=%0d", 
-                 dmem_addr, dmem_wdata, dmem_width);
-      end
-      
-      if (mem_branch_taken) begin
-        $display("  BRANCH TAKEN: target=0x%08h", mem_branch_target);
-      end
-      
-      if (haz_stall) begin
-        $display("  HAZARD STALL (load-use)");
-      end
-    end
-  end
-  `endif
 
 endmodule
