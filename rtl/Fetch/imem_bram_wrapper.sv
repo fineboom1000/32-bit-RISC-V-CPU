@@ -1,5 +1,5 @@
 `timescale 1ns/1ps
-
+// Select always enable in the Ip catalog maker for BRAM gen
 module imem #(
   parameter logic [31:0] ROM_BASE = 32'h0000_1000,
   parameter int WORDS = 4096,
@@ -17,10 +17,9 @@ module imem #(
   assign addr_offset = addr - ROM_BASE;
   assign word_index  = addr_offset[13:2];  // word addressing
 
-  // Instantiate the Block RAM IP
+  // Instantiate the Block RAM IP (Always Enabled - no ena port)
   imem_bram bram_inst (
     .clka(clk),
-    .ena(read_en),
     .addra(word_index),
     .douta(instruction)
   );
