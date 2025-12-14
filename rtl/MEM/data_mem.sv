@@ -1,11 +1,10 @@
-// data_mem.sv - FIXED VERSION
-// Byte-addressable data memory (little-endian)
-// Supports byte/half/word accesses
+// data_mem.sv - for bRam now
+// Word-addressable data memory for FPGA synthesis
 `timescale 1ns/1ps
 
 module data_mem #(
-  parameter ADDR_WIDTH = 14,  // 16KB = 2^14 bytes (matches your linker RAM)
-  parameter logic [31:0] RAM_BASE = 32'h2000_0000  // matches linker ORIGIN(RAM)
+  parameter ADDR_WIDTH = 14,  // 16KB = 2^14 bytes = 2^12 words
+  parameter logic [31:0] RAM_BASE = 32'h2000_0000
 ) (
   input  logic          clk,
   input  logic          rst,
@@ -14,100 +13,91 @@ module data_mem #(
   input  logic [31:0]   mem_wdata,
   input  logic          mem_read,
   input  logic          mem_write,
-  input  logic [1:0]    mem_width,   // 00=byte, 01=half, 10=word
-  input  logic          mem_signed,  // unused (handled by mem_stage)
+  input  logic [1:0]    mem_width,
+  input  logic          mem_signed,
   output logic [31:0]   mem_rdata,
   output logic          mem_ready
 );
 
-  localparam int MEM_BYTES = 1 << ADDR_WIDTH;
+  localparam int MEM_WORDS = (1 << ADDR_WIDTH) / 4;  // 4096 words
 
-  // Byte-addressable memory array
-  (* ram_style = "block" *) logic [7:0] mem_array [0:MEM_BYTES-1];
+  // Word-addressable memory array (BRAM-friendly)
+  (* ram_style = "block" *) logic [31:0] mem_array [0:MEM_WORDS-1];
 
-  // Convert absolute address to memory offset
+  // Convert address to word index
   logic [31:0] addr_offset;
-  logic [ADDR_WIDTH-1:0] byte_index;
+  logic [$clog2(MEM_WORDS)-1:0] word_index;
   logic valid_access;
+  logic [1:0] byte_offset;
 
-  // Calculate byte index from address
   assign addr_offset = mem_addr - RAM_BASE;
-  assign byte_index = addr_offset[ADDR_WIDTH-1:0];
-  assign valid_access = (mem_addr >= RAM_BASE) && (addr_offset < MEM_BYTES);
+  assign word_index = addr_offset[ADDR_WIDTH-1:2];  // Word addressing
+  assign byte_offset = mem_addr[1:0];
+  assign valid_access = (mem_addr >= RAM_BASE) && (addr_offset < (1 << ADDR_WIDTH));
 
-  // Read logic (combinational, little-endian)
-  logic [7:0] b0, b1, b2, b3;
+  // Read logic (synchronous for BRAM)
+  logic [31:0] mem_word;
   
-  always_comb begin
-    if (valid_access && (byte_index + 3) < MEM_BYTES) begin
-      b0 = mem_array[byte_index + 0];
-      b1 = mem_array[byte_index + 1];
-      b2 = mem_array[byte_index + 2];
-      b3 = mem_array[byte_index + 3];
-    end else begin
-      b0 = 8'd0;
-      b1 = 8'd0;
-      b2 = 8'd0;
-      b3 = 8'd0;
+  always_ff @(posedge clk) begin
+    if (mem_read && valid_access) begin
+      mem_word <= mem_array[word_index];
     end
-    
-    // Always assemble full word, mem_stage handles extraction
-    mem_rdata = {b3, b2, b1, b0};
   end
 
-  // Write logic (synchronous)
+  // Extract byte/halfword from word based on byte_offset
+  always_comb begin
+    case (mem_width)
+      2'b00: begin  // Byte
+        case (byte_offset)
+          2'b00: mem_rdata = mem_signed ? {{24{mem_word[7]}}, mem_word[7:0]} : {24'b0, mem_word[7:0]};
+          2'b01: mem_rdata = mem_signed ? {{24{mem_word[15]}}, mem_word[15:8]} : {24'b0, mem_word[15:8]};
+          2'b10: mem_rdata = mem_signed ? {{24{mem_word[23]}}, mem_word[23:16]} : {24'b0, mem_word[23:16]};
+          2'b11: mem_rdata = mem_signed ? {{24{mem_word[31]}}, mem_word[31:24]} : {24'b0, mem_word[31:24]};
+        endcase
+      end
+      
+      2'b01: begin  // Halfword
+        if (byte_offset[1]) begin
+          mem_rdata = mem_signed ? {{16{mem_word[31]}}, mem_word[31:16]} : {16'b0, mem_word[31:16]};
+        end else begin
+          mem_rdata = mem_signed ? {{16{mem_word[15]}}, mem_word[15:0]} : {16'b0, mem_word[15:0]};
+        end
+      end
+      
+      default: mem_rdata = mem_word;  // Word
+    endcase
+  end
+
+  // Write logic with byte enables
   always_ff @(posedge clk) begin
     if (rst) begin
-      // Memory initialization happens via linker_loader
+      // Optional: Initialize memory
     end else if (mem_write && valid_access) begin
       case (mem_width)
-        2'b10: begin // word write (4 bytes)
-          if ((byte_index + 3) < MEM_BYTES) begin
-            mem_array[byte_index + 0] <= mem_wdata[7:0];
-            mem_array[byte_index + 1] <= mem_wdata[15:8];
-            mem_array[byte_index + 2] <= mem_wdata[23:16];
-            mem_array[byte_index + 3] <= mem_wdata[31:24];
+        2'b00: begin  // Byte write
+          case (byte_offset)
+            2'b00: mem_array[word_index][7:0]   <= mem_wdata[7:0];
+            2'b01: mem_array[word_index][15:8]  <= mem_wdata[7:0];
+            2'b10: mem_array[word_index][23:16] <= mem_wdata[7:0];
+            2'b11: mem_array[word_index][31:24] <= mem_wdata[7:0];
+          endcase
+        end
+        
+        2'b01: begin  // Halfword write
+          if (byte_offset[1]) begin
+            mem_array[word_index][31:16] <= mem_wdata[15:0];
+          end else begin
+            mem_array[word_index][15:0] <= mem_wdata[15:0];
           end
         end
         
-        2'b01: begin // half write (2 bytes)
-          if ((byte_index + 1) < MEM_BYTES) begin
-            mem_array[byte_index + 0] <= mem_wdata[7:0];
-            mem_array[byte_index + 1] <= mem_wdata[15:8];
-            
-          end
-        end
-        
-        2'b00: begin // byte write (1 byte)
-          if (byte_index < MEM_BYTES) begin
-            mem_array[byte_index] <= mem_wdata[7:0];
-            
-          end
-        end
-        
-        default: begin
-          if ((byte_index + 3) < MEM_BYTES) begin
-            mem_array[byte_index + 0] <= mem_wdata[7:0];
-            mem_array[byte_index + 1] <= mem_wdata[15:8];
-            mem_array[byte_index + 2] <= mem_wdata[23:16];
-            mem_array[byte_index + 3] <= mem_wdata[31:24];
-          end
+        default: begin  // Word write
+          mem_array[word_index] <= mem_wdata;
         end
       endcase
-    end else if (mem_write && !valid_access) begin
-     
     end
   end
 
-  // Always ready (simple model)
   assign mem_ready = 1'b1;
-
-  // Debug: display reads too
-  always @(posedge clk) begin
-    if (mem_read && !rst && valid_access) begin
-    end else if (mem_read && !rst && !valid_access) begin
-
-    end
-  end
 
 endmodule
