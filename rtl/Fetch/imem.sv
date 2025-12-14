@@ -1,4 +1,3 @@
-// imem.sv
 `timescale 1ns/1ps
 
 module imem #(
@@ -12,31 +11,32 @@ module imem #(
   output logic [31:0] instruction
 );
 
-  // storage array
   (* ram_style = "block" *) logic [31:0] mem [0:WORDS-1];
 
+  // Simple test program - LED blinker
+  initial begin
+    // Load a simple program that writes to GPIO
+    mem[0] = 32'h80000537;  // lui a0, 0x80000 (GPIO base)
+    mem[1] = 32'h00100593;  // li a1, 1
+    mem[2] = 32'h00b52023;  // sw a1, 0(a0) - write to LED
+    mem[3] = 32'h0000006f;  // j . (infinite loop)
+    
+    // Fill rest with NOPs
+    for (int i = 4; i < WORDS; i = i + 1) begin
+      mem[i] = 32'h00000013;  // NOP (addi x0, x0, 0)
+    end
+  end
 
-
-  // compute word index from byte address
   logic [31:0] addr_offset;
   logic [$clog2(WORDS)-1:0] word_index;
   
   assign addr_offset = addr - ROM_BASE;
   assign word_index  = addr_offset[31:2];
 
-  generate
-    if (SYNC) begin : sync_read
-      logic [$clog2(WORDS)-1:0] sampled_idx;
-      
-      always_ff @(posedge clk) begin
-        if (read_en) begin
-          sampled_idx <= word_index;
-        end
-        instruction <= mem[sampled_idx];
-      end
-    end else begin : async_read
-      assign instruction = mem[word_index];
+  always_ff @(posedge clk) begin
+    if (read_en) begin
+      instruction <= mem[word_index];
     end
-  endgenerate
+  end
 
 endmodule
