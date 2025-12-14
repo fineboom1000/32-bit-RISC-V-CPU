@@ -23,7 +23,7 @@ module data_mem #(
   localparam int MEM_BYTES = 1 << ADDR_WIDTH;
 
   // Byte-addressable memory array
-  logic [7:0] mem_array [0:MEM_BYTES-1];
+  (* ram_style = "block" *) logic [7:0] mem_array [0:MEM_BYTES-1];
 
   // Convert absolute address to memory offset
   logic [31:0] addr_offset;
@@ -67,8 +67,6 @@ module data_mem #(
             mem_array[byte_index + 1] <= mem_wdata[15:8];
             mem_array[byte_index + 2] <= mem_wdata[23:16];
             mem_array[byte_index + 3] <= mem_wdata[31:24];
-            $display("DMEM Word Write: addr=0x%08h idx=%0d data=0x%08h", 
-                     mem_addr, byte_index, mem_wdata);
           end
         end
         
@@ -76,16 +74,14 @@ module data_mem #(
           if ((byte_index + 1) < MEM_BYTES) begin
             mem_array[byte_index + 0] <= mem_wdata[7:0];
             mem_array[byte_index + 1] <= mem_wdata[15:8];
-            $display("DMEM Half Write: addr=0x%08h idx=%0d data=0x%04h", 
-                     mem_addr, byte_index, mem_wdata[15:0]);
+            
           end
         end
         
         2'b00: begin // byte write (1 byte)
           if (byte_index < MEM_BYTES) begin
             mem_array[byte_index] <= mem_wdata[7:0];
-            $display("DMEM Byte Write: addr=0x%08h idx=%0d data=0x%02h", 
-                     mem_addr, byte_index, mem_wdata[7:0]);
+            
           end
         end
         
@@ -99,7 +95,7 @@ module data_mem #(
         end
       endcase
     end else if (mem_write && !valid_access) begin
-      $display("DMEM INVALID WRITE: addr=0x%08h (out of range)", mem_addr);
+     
     end
   end
 
@@ -109,10 +105,8 @@ module data_mem #(
   // Debug: display reads too
   always @(posedge clk) begin
     if (mem_read && !rst && valid_access) begin
-      $display("DMEM Read: addr=0x%08h idx=%0d data=0x%08h", 
-               mem_addr, byte_index, mem_rdata);
     end else if (mem_read && !rst && !valid_access) begin
-      $display("DMEM INVALID READ: addr=0x%08h (out of range)", mem_addr);
+
     end
   end
 

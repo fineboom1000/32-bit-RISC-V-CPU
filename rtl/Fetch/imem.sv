@@ -13,13 +13,9 @@ module imem #(
 );
 
   // storage array
-  logic [31:0] mem [0:WORDS-1];
+  (* ram_style = "block" *) logic [31:0] mem [0:WORDS-1];
 
-  // Memory will be loaded by linker_loader.sv, not here
-  initial begin
-    $display("IMEM: initialized (WORDS=%0d, BASE=0x%08h)", WORDS, ROM_BASE);
-    $display("IMEM: memory will be loaded by linker_loader");
-  end
+
 
   // compute word index from byte address
   logic [31:0] addr_offset;
