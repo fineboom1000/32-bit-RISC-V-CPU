@@ -8,7 +8,7 @@ module arty_s7_top (
     input wire         reset_n,
     input wire [3:0]   sw,
     input wire [3:0]   btn,
-    output wire [3:0]  led,
+    output wire [1:0]  led,
     output wire        led0_r,
     output wire        led0_g,
     output wire        led0_b
