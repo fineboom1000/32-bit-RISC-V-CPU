@@ -7,7 +7,7 @@
 _start:
     # set stack pointer
     lui  sp, 0x20004
-    
+    addi sp, sp, -4  # sp = 0x20003FFC
     # zero bss section
     la   t0, _sbss
     la   t1, _ebss
