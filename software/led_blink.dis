@@ -1,0 +1,95 @@
+
+led_blink.elf:     file format elf32-littleriscv
+
+
+Disassembly of section .text:
+
+00001000 <_start>:
+    1000:	20004137          	lui	sp,0x20004
+    1004:	1ffff297          	auipc	t0,0x1ffff
+    1008:	ffc28293          	addi	t0,t0,-4 # 20000000 <_ebss>
+    100c:	1ffff317          	auipc	t1,0x1ffff
+    1010:	ff430313          	addi	t1,t1,-12 # 20000000 <_ebss>
+    1014:	00628863          	beq	t0,t1,1024 <_start+0x24>
+    1018:	0002a023          	sw	zero,0(t0)
+    101c:	00428293          	addi	t0,t0,4
+    1020:	fe62cce3          	blt	t0,t1,1018 <_start+0x18>
+    1024:	008000ef          	jal	102c <main>
+    1028:	0000006f          	j	1028 <_start+0x28>
+
+0000102c <main>:
+    102c:	80000537          	lui	a0,0x80000
+    1030:	800005b7          	lui	a1,0x80000
+    1034:	ff010113          	addi	sp,sp,-16 # 20003ff0 <_ebss+0x3ff0>
+    1038:	00450513          	addi	a0,a0,4 # 80000004 <_stack_top+0x5fffc004>
+    103c:	00858593          	addi	a1,a1,8 # 80000008 <_stack_top+0x5fffc008>
+    1040:	00000693          	li	a3,0
+    1044:	80000837          	lui	a6,0x80000
+    1048:	3e700713          	li	a4,999
+    104c:	00052603          	lw	a2,0(a0)
+    1050:	0005a783          	lw	a5,0(a1)
+    1054:	0017f793          	andi	a5,a5,1
+    1058:	00079663          	bnez	a5,1064 <main+0x38>
+    105c:	0146d613          	srli	a2,a3,0x14
+    1060:	00f67613          	andi	a2,a2,15
+    1064:	0126d793          	srli	a5,a3,0x12
+    1068:	0707f793          	andi	a5,a5,112
+    106c:	00c7e7b3          	or	a5,a5,a2
+    1070:	00f82023          	sw	a5,0(a6) # 80000000 <_stack_top+0x5fffc000>
+    1074:	00012623          	sw	zero,12(sp)
+    1078:	00c12783          	lw	a5,12(sp)
+    107c:	00f76e63          	bltu	a4,a5,1098 <main+0x6c>
+    1080:	00000013          	nop
+    1084:	00c12783          	lw	a5,12(sp)
+    1088:	00178793          	addi	a5,a5,1
+    108c:	00f12623          	sw	a5,12(sp)
+    1090:	00c12783          	lw	a5,12(sp)
+    1094:	fef776e3          	bgeu	a4,a5,1080 <main+0x54>
+    1098:	00168693          	addi	a3,a3,1
+    109c:	fb1ff06f          	j	104c <main+0x20>
+
+000010a0 <delay>:
+    10a0:	ff010113          	addi	sp,sp,-16
+    10a4:	00012623          	sw	zero,12(sp)
+    10a8:	00c12783          	lw	a5,12(sp)
+    10ac:	00a7fe63          	bgeu	a5,a0,10c8 <delay+0x28>
+    10b0:	00000013          	nop
+    10b4:	00c12783          	lw	a5,12(sp)
+    10b8:	00178793          	addi	a5,a5,1
+    10bc:	00f12623          	sw	a5,12(sp)
+    10c0:	00c12783          	lw	a5,12(sp)
+    10c4:	fea7e6e3          	bltu	a5,a0,10b0 <delay+0x10>
+    10c8:	01010113          	addi	sp,sp,16
+    10cc:	00008067          	ret
+
+Disassembly of section .riscv.attributes:
+
+00000000 <.riscv.attributes>:
+   0:	1b41                	.insn	2, 0x1b41
+   2:	0000                	.insn	2, 0x0000
+   4:	7200                	.insn	2, 0x7200
+   6:	7369                	.insn	2, 0x7369
+   8:	01007663          	bgeu	zero,a6,14 <_start-0xfec>
+   c:	0011                	.insn	2, 0x0011
+   e:	0000                	.insn	2, 0x0000
+  10:	1004                	.insn	2, 0x1004
+  12:	7205                	.insn	2, 0x7205
+  14:	3376                	.insn	2, 0x3376
+  16:	6932                	.insn	2, 0x6932
+  18:	7032                	.insn	2, 0x7032
+  1a:	0031                	.insn	2, 0x0031
+
+Disassembly of section .comment:
+
+00000000 <.comment>:
+   0:	3a434347          	.insn	4, 0x3a434347
+   4:	2820                	.insn	2, 0x2820
+   6:	33623167          	.insn	4, 0x33623167
+   a:	3630                	.insn	2, 0x3630
+   c:	3330                	.insn	2, 0x3330
+   e:	6139                	.insn	2, 0x6139
+  10:	2029                	.insn	2, 0x2029
+  12:	3531                	.insn	2, 0x3531
+  14:	312e                	.insn	2, 0x312e
+  16:	302e                	.insn	2, 0x302e
+	...
