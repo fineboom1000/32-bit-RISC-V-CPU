@@ -120,10 +120,20 @@ module arty_s7_top (
     assign dmem_rdata = accessing_gpio ? gpio_rdata : ram_rdata;
     assign dmem_ready = accessing_gpio ? 1'b1 : ram_ready;
     
-    // led output assignment
-    assign led = gpio_led_reg[3:0];
-    assign led0_r = gpio_led_reg[4];
-    assign led0_g = gpio_led_reg[5];
-    assign led0_b = gpio_led_reg[6];
-
+    // LED TEST - bypass CPU, direct counter
+    reg [25:0] counter;
+    
+    always @(posedge clk_cpu) begin
+        if (reset) begin
+            counter <= 0;
+        end else begin
+            counter <= counter + 1;
+        end
+    end
+    
+    // Drive LEDs from counter directly
+    assign led = counter[25:24];        // Slow counter for LED[1:0]
+    assign led0_r = counter[23];        // RGB red
+    assign led0_g = counter[22];        // RGB green  
+    assign led0_b = counter[21];        // RGB blue
 endmodule
