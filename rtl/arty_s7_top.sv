@@ -1,5 +1,5 @@
-// arty_s7_top.sv 
-// LEDs now connected to GPIO register, not counter
+// arty_s7_top.sv - DEBUG BOTH PC AND GPIO
+// Use switch[0] to toggle between PC view and GPIO view
 `timescale 1ns/1ps
 
 module arty_s7_top (
@@ -18,14 +18,12 @@ module arty_s7_top (
     
     assign clk_cpu = clk;
     
-    // Synchronize reset
     reg [2:0] reset_sync;
     always @(posedge clk_cpu) begin
         reset_sync <= {reset_sync[1:0], ~reset_n};
     end
     assign reset = reset_sync[2];
 
-    // Data memory interface from CPU
     wire [31:0] dmem_addr;
     wire [31:0] dmem_wdata;
     wire        dmem_read;
@@ -35,7 +33,6 @@ module arty_s7_top (
     wire [31:0] dmem_rdata;
     wire        dmem_ready;
     
-    // Instantiate CPU
     cpu_top #(
         .ROM_BASE(32'h0000_1000),
         .RAM_BASE(32'h2000_0000),
@@ -54,21 +51,15 @@ module arty_s7_top (
         .dmem_ready_in(dmem_ready)
     );
 
-    // Memory map
-    // 0x20000000 to 0x20003FFF: RAM (16KB)
-    // 0x80000000 to 0x8000000F: GPIO
-    
     localparam GPIO_BASE = 32'h8000_0000;
     localparam RAM_BASE  = 32'h2000_0000;
     localparam RAM_SIZE  = 32'h0000_4000;
     
-    // Decode memory regions
     wire accessing_ram  = (dmem_addr >= RAM_BASE) && 
                           (dmem_addr < (RAM_BASE + RAM_SIZE));
     wire accessing_gpio = (dmem_addr >= GPIO_BASE) && 
                           (dmem_addr < (GPIO_BASE + 32'h10));
     
-    // RAM instance
     wire [31:0] ram_rdata;
     wire        ram_ready;
     
@@ -88,40 +79,57 @@ module arty_s7_top (
         .mem_ready(ram_ready)
     );
     
-    // GPIO registers
-    // 0x80000000: LED output (write)
-    // 0x80000004: Switch input (read)
-    // 0x80000008: Button input (read)
-    
     reg [31:0] gpio_led_reg;
     wire [31:0] gpio_rdata;
     
-    // GPIO write
+    // GPIO write - also add debug signal
+    reg gpio_write_happened;
+    
     always @(posedge clk_cpu) begin
         if (reset) begin
             gpio_led_reg <= 32'd0;
+            gpio_write_happened <= 1'b0;
         end else if (dmem_write && accessing_gpio) begin
             case (dmem_addr[3:0])
-                4'h0: gpio_led_reg <= dmem_wdata;
+                4'h0: begin
+                    gpio_led_reg <= dmem_wdata;
+                    gpio_write_happened <= 1'b1;  // Flag that write occurred
+                end
                 default: ;
             endcase
         end
     end
     
-    // GPIO read
     assign gpio_rdata = (dmem_addr[3:0] == 4'h0) ? gpio_led_reg :
                         (dmem_addr[3:0] == 4'h4) ? {28'd0, sw} :
                         (dmem_addr[3:0] == 4'h8) ? {28'd0, btn} :
                         32'd0;
     
-    // Memory multiplexer
     assign dmem_rdata = accessing_gpio ? gpio_rdata : ram_rdata;
     assign dmem_ready = accessing_gpio ? 1'b1 : ram_ready;
     
-    // Connect LEDs to GPIO register 
-    assign led = gpio_led_reg[1:0];
-    assign led0_r = gpio_led_reg[2];
-    assign led0_g = gpio_led_reg[3];
-    assign led0_b = gpio_led_reg[4];
+    // DEBUG: Get PC
+    wire [31:0] debug_pc = cpu.pc_current;
+    
+    // LED output logic:
+    // sw[0] = 0: Show PC (to verify CPU is running)
+    // sw[0] = 1: Show GPIO register (to see what CPU wrote)
+    //
+    // sw[1] = 1: Force show if GPIO write happened (diagnostic)
+    
+    wire [4:0] pc_view = {debug_pc[6:4], debug_pc[3:2]};
+    wire [4:0] gpio_view = gpio_led_reg[4:0];
+    wire [4:0] led_out;
+    
+    // If sw[1] is high, blink to show GPIO write occurred
+    wire blink = gpio_write_happened & debug_pc[20];
+    
+    assign led_out = sw[1] ? (blink ? 5'b11111 : 5'b00000) :
+                     (sw[0] ? gpio_view : pc_view);
+    
+    assign led = led_out[1:0];
+    assign led0_r = led_out[2];
+    assign led0_g = led_out[3];
+    assign led0_b = led_out[4];
     
 endmodule
