@@ -1,6 +1,5 @@
-// arty_s7_top.sv
-// top level module for arty s7 fpga
-// wraps cpu and adds memory mapped gpio
+// arty_s7_top.sv 
+// LEDs now connected to GPIO register, not counter
 `timescale 1ns/1ps
 
 module arty_s7_top (
@@ -14,20 +13,19 @@ module arty_s7_top (
     output wire        led0_b
 );
 
-    // clock and reset
     wire clk_cpu;
     wire reset;
     
     assign clk_cpu = clk;
     
-    // synchronize reset
+    // Synchronize reset
     reg [2:0] reset_sync;
     always @(posedge clk_cpu) begin
         reset_sync <= {reset_sync[1:0], ~reset_n};
     end
     assign reset = reset_sync[2];
 
-    // data memory interface from cpu
+    // Data memory interface from CPU
     wire [31:0] dmem_addr;
     wire [31:0] dmem_wdata;
     wire        dmem_read;
@@ -37,7 +35,7 @@ module arty_s7_top (
     wire [31:0] dmem_rdata;
     wire        dmem_ready;
     
-    // instantiate cpu
+    // Instantiate CPU
     cpu_top #(
         .ROM_BASE(32'h0000_1000),
         .RAM_BASE(32'h2000_0000),
@@ -56,21 +54,21 @@ module arty_s7_top (
         .dmem_ready_in(dmem_ready)
     );
 
-    // memory map
-    // 0x20000000 to 0x20003fff ram 16kb
-    // 0x80000000 to 0x8000000f gpio
+    // Memory map
+    // 0x20000000 to 0x20003FFF: RAM (16KB)
+    // 0x80000000 to 0x8000000F: GPIO
     
     localparam GPIO_BASE = 32'h8000_0000;
     localparam RAM_BASE  = 32'h2000_0000;
     localparam RAM_SIZE  = 32'h0000_4000;
     
-    // decode memory regions
+    // Decode memory regions
     wire accessing_ram  = (dmem_addr >= RAM_BASE) && 
                           (dmem_addr < (RAM_BASE + RAM_SIZE));
     wire accessing_gpio = (dmem_addr >= GPIO_BASE) && 
                           (dmem_addr < (GPIO_BASE + 32'h10));
     
-    // ram instance
+    // RAM instance
     wire [31:0] ram_rdata;
     wire        ram_ready;
     
@@ -90,15 +88,15 @@ module arty_s7_top (
         .mem_ready(ram_ready)
     );
     
-    // gpio registers
-    // 0x80000000 led output write
-    // 0x80000004 switch input read
-    // 0x80000008 button input read
+    // GPIO registers
+    // 0x80000000: LED output (write)
+    // 0x80000004: Switch input (read)
+    // 0x80000008: Button input (read)
     
     reg [31:0] gpio_led_reg;
     wire [31:0] gpio_rdata;
     
-    // gpio write
+    // GPIO write
     always @(posedge clk_cpu) begin
         if (reset) begin
             gpio_led_reg <= 32'd0;
@@ -110,30 +108,20 @@ module arty_s7_top (
         end
     end
     
-    // gpio read
+    // GPIO read
     assign gpio_rdata = (dmem_addr[3:0] == 4'h0) ? gpio_led_reg :
                         (dmem_addr[3:0] == 4'h4) ? {28'd0, sw} :
                         (dmem_addr[3:0] == 4'h8) ? {28'd0, btn} :
                         32'd0;
     
-    // memory multiplexer
+    // Memory multiplexer
     assign dmem_rdata = accessing_gpio ? gpio_rdata : ram_rdata;
     assign dmem_ready = accessing_gpio ? 1'b1 : ram_ready;
     
-    // LED TEST - bypass CPU, direct counter
-    reg [25:0] counter;
+    // Connect LEDs to GPIO register 
+    assign led = gpio_led_reg[1:0];
+    assign led0_r = gpio_led_reg[2];
+    assign led0_g = gpio_led_reg[3];
+    assign led0_b = gpio_led_reg[4];
     
-    always @(posedge clk_cpu) begin
-        if (reset) begin
-            counter <= 0;
-        end else begin
-            counter <= counter + 1;
-        end
-    end
-    
-    // Drive LEDs from counter directly
-    assign led = counter[25:24];        // Slow counter for LED[1:0]
-    assign led0_r = counter[23];        // RGB red
-    assign led0_g = counter[22];        // RGB green  
-    assign led0_b = counter[21];        // RGB blue
 endmodule
