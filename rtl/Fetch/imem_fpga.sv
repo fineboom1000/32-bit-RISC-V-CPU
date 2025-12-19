@@ -13,17 +13,16 @@ module imem #(
 
   (* ram_style = "block" *) logic [31:0] mem [0:WORDS-1];
 
-  // Simple test program - LED blinker
+  // Test program - writes 0x55 to GPIO
   initial begin
-    // Load a simple program that writes to GPIO
-    mem[0] = 32'h80000537;  // lui a0, 0x80000 (GPIO base)
-    mem[1] = 32'h00100593;  // li a1, 1
-    mem[2] = 32'h00b52023;  // sw a1, 0(a0) - write to LED
-    mem[3] = 32'h0000006f;  // j . (infinite loop)
+    mem[0] = 32'h80000537;  // lui a0, 0x80000
+    mem[1] = 32'h05500593;  // li a1, 0x55
+    mem[2] = 32'h00b52023;  // sw a1, 0(a0)
+    mem[3] = 32'h0000006f;  // j loop
     
     // Fill rest with NOPs
-    for (int i = 4; i < WORDS; i = i + 1) begin
-      mem[i] = 32'h00000013;  // NOP (addi x0, x0, 0)
+    for (int i = 4; i < WORDS; i++) begin
+      mem[i] = 32'h00000013;  // NOP
     end
   end
 
