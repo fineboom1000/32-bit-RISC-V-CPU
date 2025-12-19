@@ -127,9 +127,9 @@ module arty_s7_top (
     // Map to outputs:
     // 4 solid LEDs get bits [6:3] - these change slowly = VISIBLE!
     // RGB LED gets bits [2:0] - these change faster
-    assign led[3:0] = led_source[6:3];  // LD5, LD4, LD3, LD2
-    assign led0_r   = led_source[2];
-    assign led0_g   = led_source[1];
-    assign led0_b   = led_source[0];
+    assign led[3:0] = ~led_source[6:3];  // LD5, LD4, LD3, LD2
+    assign led0_r   = ~led_source[2];
+    assign led0_g   = ~led_source[1];
+    assign led0_b   = ~led_source[0];
     
 endmodule
