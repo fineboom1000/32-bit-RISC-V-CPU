@@ -62,7 +62,7 @@ module arty_s7_top (
     // Address decode
     wire accessing_ram  = (dmem_addr >= RAM_BASE) && 
                           (dmem_addr < (RAM_BASE + RAM_SIZE));
-    wire accessing_gpio = (dmem_addr >= GPIO_BASE) && 
+    wire accessing_gpio = (dmem_addr >= GPIO_BASE) &&
                           (dmem_addr < (GPIO_BASE + 32'h10));
     
     // Data RAM signals
