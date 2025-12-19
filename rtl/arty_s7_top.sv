@@ -94,14 +94,16 @@ module arty_s7_top (
     always @(posedge clk_cpu) begin
         if (reset) begin
             gpio_led_reg <= 32'd0;
-        end else if (dmem_write && accessing_gpio) begin
-            case (dmem_addr[3:0])
-                4'h0: gpio_led_reg <= dmem_wdata;
-                default: ;
-            endcase
+        end else begin
+            gpio_led_reg <= gpio_led_reg + 1;  // TEMP: Just count up
+            if (dmem_write && accessing_gpio) begin
+                case (dmem_addr[3:0])
+                    4'h0: gpio_led_reg <= dmem_wdata;
+                    default: ;
+                endcase
+            end
         end
     end
-    
     // GPIO read logic
     assign gpio_rdata = (dmem_addr[3:0] == 4'h0) ? gpio_led_reg :
                         (dmem_addr[3:0] == 4'h4) ? {28'd0, sw} :
