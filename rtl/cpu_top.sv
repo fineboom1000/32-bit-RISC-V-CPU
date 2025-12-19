@@ -257,7 +257,7 @@ module cpu_top #(
     .clk                  (clk),
     .rst                  (rst),
     .stall_ex             (1'b0),
-    .flush_ex             (mem_branch_taken),
+    .flush_ex             (ex_out_branch_taken),
     
     .mem_in_alu_result    (ex_out_alu_result),
     .mem_in_rs2_for_store (ex_out_rs2_for_store),
