@@ -1,5 +1,5 @@
-// arty_s7_top.sv - DEBUG BOTH PC AND GPIO
-// Use switch[0] to toggle between PC view and GPIO view
+// arty_s7_top.sv - COMPLETE FIXED VERSION
+// All 4 solid LEDs connected + RGB LED0
 `timescale 1ns/1ps
 
 module arty_s7_top (
@@ -7,10 +7,10 @@ module arty_s7_top (
     input wire         reset_n,
     input wire [3:0]   sw,
     input wire [3:0]   btn,
-    output wire [1:0]  led,
-    output wire        led0_r,
-    output wire        led0_g,
-    output wire        led0_b
+    output wire [3:0]  led,        // 4 solid LEDs: LD2, LD3, LD4, LD5
+    output wire        led0_r,     // RGB LED0 red
+    output wire        led0_g,     // RGB LED0 green
+    output wire        led0_b      // RGB LED0 blue
 );
 
     wire clk_cpu;
@@ -18,12 +18,14 @@ module arty_s7_top (
     
     assign clk_cpu = clk;
     
+    // Synchronize reset
     reg [2:0] reset_sync;
     always @(posedge clk_cpu) begin
         reset_sync <= {reset_sync[1:0], ~reset_n};
     end
     assign reset = reset_sync[2];
 
+    // CPU data memory interface
     wire [31:0] dmem_addr;
     wire [31:0] dmem_wdata;
     wire        dmem_read;
@@ -33,6 +35,7 @@ module arty_s7_top (
     wire [31:0] dmem_rdata;
     wire        dmem_ready;
     
+    // Instantiate CPU
     cpu_top #(
         .ROM_BASE(32'h0000_1000),
         .RAM_BASE(32'h2000_0000),
@@ -51,18 +54,22 @@ module arty_s7_top (
         .dmem_ready_in(dmem_ready)
     );
 
+    // Memory map
     localparam GPIO_BASE = 32'h8000_0000;
     localparam RAM_BASE  = 32'h2000_0000;
     localparam RAM_SIZE  = 32'h0000_4000;
     
+    // Address decode
     wire accessing_ram  = (dmem_addr >= RAM_BASE) && 
                           (dmem_addr < (RAM_BASE + RAM_SIZE));
     wire accessing_gpio = (dmem_addr >= GPIO_BASE) && 
                           (dmem_addr < (GPIO_BASE + 32'h10));
     
+    // Data RAM signals
     wire [31:0] ram_rdata;
     wire        ram_ready;
     
+    // Instantiate data memory
     data_mem #(
         .ADDR_WIDTH(14),
         .RAM_BASE(RAM_BASE)
@@ -79,57 +86,50 @@ module arty_s7_top (
         .mem_ready(ram_ready)
     );
     
+    // GPIO registers
     reg [31:0] gpio_led_reg;
     wire [31:0] gpio_rdata;
     
-    // GPIO write - also add debug signal
-    reg gpio_write_happened;
-    
+    // GPIO write logic
     always @(posedge clk_cpu) begin
         if (reset) begin
             gpio_led_reg <= 32'd0;
-            gpio_write_happened <= 1'b0;
         end else if (dmem_write && accessing_gpio) begin
             case (dmem_addr[3:0])
-                4'h0: begin
-                    gpio_led_reg <= dmem_wdata;
-                    gpio_write_happened <= 1'b1;  // Flag that write occurred
-                end
+                4'h0: gpio_led_reg <= dmem_wdata;
                 default: ;
             endcase
         end
     end
     
+    // GPIO read logic
     assign gpio_rdata = (dmem_addr[3:0] == 4'h0) ? gpio_led_reg :
                         (dmem_addr[3:0] == 4'h4) ? {28'd0, sw} :
                         (dmem_addr[3:0] == 4'h8) ? {28'd0, btn} :
                         32'd0;
     
+    // Memory subsystem outputs
     assign dmem_rdata = accessing_gpio ? gpio_rdata : ram_rdata;
     assign dmem_ready = accessing_gpio ? 1'b1 : ram_ready;
     
-    // DEBUG: Get PC
+    // Get PC for debugging
     wire [31:0] debug_pc = cpu.pc_current;
     
-    // LED output logic:
-    // sw[0] = 0: Show PC (to verify CPU is running)
-    // sw[0] = 1: Show GPIO register (to see what CPU wrote)
-    //
-    // sw[1] = 1: Force show if GPIO write happened (diagnostic)
+    // LED MAPPING - FIXED!
+    // sw[0] = 0: Show PC bits (verify CPU running)
+    // sw[0] = 1: Show GPIO counter (the test program)
     
-    wire [4:0] pc_view = {debug_pc[6:4], debug_pc[3:2]};
-    wire [4:0] gpio_view = gpio_led_reg[4:0];
-    wire [4:0] led_out;
+    wire [6:0] gpio_counter = gpio_led_reg[6:0];
+    wire [6:0] pc_view = debug_pc[8:2];
     
-    // If sw[1] is high, blink to show GPIO write occurred
-    wire blink = gpio_write_happened & debug_pc[20];
+    wire [6:0] led_source = sw[0] ? gpio_counter : pc_view;
     
-    assign led_out = sw[1] ? (blink ? 5'b11111 : 5'b00000) :
-                     (sw[0] ? gpio_view : pc_view);
-    
-    assign led = led_out[1:0];
-    assign led0_r = led_out[2];
-    assign led0_g = led_out[3];
-    assign led0_b = led_out[4];
+    // Map to outputs:
+    // 4 solid LEDs get bits [6:3] - these change slowly = VISIBLE!
+    // RGB LED gets bits [2:0] - these change faster
+    assign led[3:0] = led_source[6:3];  // LD5, LD4, LD3, LD2
+    assign led0_r   = led_source[2];
+    assign led0_g   = led_source[1];
+    assign led0_b   = led_source[0];
     
 endmodule
