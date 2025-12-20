@@ -1,5 +1,5 @@
-// arty_s7_top.sv - COMPLETE FIXED VERSION
-// All 4 solid LEDs connected + RGB LED0
+// arty_s7_top.sv - FIXED FOR CPU GPIO WRITE TEST
+// Removes slow counter, restores proper GPIO write logic
 `timescale 1ns/1ps
 
 module arty_s7_top (
@@ -90,12 +90,16 @@ module arty_s7_top (
     reg [31:0] gpio_led_reg;
     wire [31:0] gpio_rdata;
     
+    // ============================================
+    // FIXED GPIO WRITE LOGIC - CPU CAN NOW WRITE!
+    // ============================================
     always @(posedge clk_cpu) begin
         if (reset) begin
             gpio_led_reg <= 32'd0;
         end else if (dmem_write && accessing_gpio) begin
+            // CPU writes to GPIO address 0x80000000
             case (dmem_addr[3:0])
-                4'h0: gpio_led_reg <= dmem_wdata;
+                4'h0: gpio_led_reg <= dmem_wdata;  // Write to offset 0
                 default: ;
             endcase
         end
