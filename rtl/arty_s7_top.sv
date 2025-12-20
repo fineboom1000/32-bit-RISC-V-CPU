@@ -1,4 +1,4 @@
-// arty_s7_top.sv - FIXED FOR CPU GPIO WRITE TEST
+// arty_s7_top.sv - xw
 // Removes slow counter, restores proper GPIO write logic
 `timescale 1ns/1ps
 
@@ -90,9 +90,8 @@ module arty_s7_top (
     reg [31:0] gpio_led_reg;
     wire [31:0] gpio_rdata;
     
-    // ============================================
-    // FIXED GPIO WRITE LOGIC - CPU CAN NOW WRITE!
-    // ============================================
+    // GPIO WRITE LOGIC 
+ 
     always @(posedge clk_cpu) begin
         if (reset) begin
             gpio_led_reg <= 32'd0;
@@ -119,8 +118,8 @@ module arty_s7_top (
     wire [31:0] debug_pc = cpu.pc_current;
     
     // LED MAPPING
-    wire [6:0] gpio_counter = gpio_led_reg[6:0];
-    wire [6:0] pc_view = debug_pc[8:2];
+    wire [6:0] gpio_counter = gpio_led_reg[26:20];  // Changed from [6:0]
+    wire [6:0] pc_view = debug_pc[26:20];            // Changed from [8:2]
     wire [6:0] led_source = sw[0] ? gpio_counter : pc_view;
     
     // Map to outputs (inverted for active-low LEDs)
