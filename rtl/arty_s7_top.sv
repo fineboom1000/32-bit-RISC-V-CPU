@@ -90,17 +90,14 @@ module arty_s7_top (
     reg [31:0] gpio_led_reg;
     wire [31:0] gpio_rdata;
     
-    // GPIO write logic - SLOW COUNTER TEST
-    reg [23:0] slow_counter;
     always @(posedge clk_cpu) begin
         if (reset) begin
             gpio_led_reg <= 32'd0;
-            slow_counter <= 24'd0;
-        end else begin
-            slow_counter <= slow_counter + 1;
-            if (slow_counter == 24'd0) begin  // Every 16M clocks (~0.16 sec)
-                gpio_led_reg <= gpio_led_reg + 1;
-            end
+        end else if (dmem_write && accessing_gpio) begin
+            case (dmem_addr[3:0])
+                4'h0: gpio_led_reg <= dmem_wdata;
+                default: ;
+            endcase
         end
     end
 
