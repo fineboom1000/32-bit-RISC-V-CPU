@@ -62,7 +62,7 @@ module arty_s7_top (
     // Address decode
     wire accessing_ram  = (dmem_addr >= RAM_BASE) && 
                           (dmem_addr < (RAM_BASE + RAM_SIZE));
-    wire accessing_gpio = (dmem_addr >= GPIO_BASE) &&
+    wire accessing_gpio = (dmem_addr >= GPIO_BASE) && 
                           (dmem_addr < (GPIO_BASE + 32'h10));
     
     // Data RAM signals
@@ -90,20 +90,15 @@ module arty_s7_top (
     reg [31:0] gpio_led_reg;
     wire [31:0] gpio_rdata;
     
-    // GPIO write logic
+    // GPIO write logic - PURE COUNTER TEST
     always @(posedge clk_cpu) begin
         if (reset) begin
             gpio_led_reg <= 32'd0;
         end else begin
-            gpio_led_reg <= gpio_led_reg + 1;  // TEMP: Just count up
-            if (dmem_write && accessing_gpio) begin
-                case (dmem_addr[3:0])
-                    4'h0: gpio_led_reg <= dmem_wdata;
-                    default: ;
-                endcase
-            end
+            gpio_led_reg <= gpio_led_reg + 1;
         end
     end
+    
     // GPIO read logic
     assign gpio_rdata = (dmem_addr[3:0] == 4'h0) ? gpio_led_reg :
                         (dmem_addr[3:0] == 4'h4) ? {28'd0, sw} :
@@ -117,19 +112,13 @@ module arty_s7_top (
     // Get PC for debugging
     wire [31:0] debug_pc = cpu.pc_current;
     
-    // LED MAPPING - FIXED!
-    // sw[0] = 0: Show PC bits (verify CPU running)
-    // sw[0] = 1: Show GPIO counter (the test program)
-    
+    // LED MAPPING
     wire [6:0] gpio_counter = gpio_led_reg[6:0];
     wire [6:0] pc_view = debug_pc[8:2];
-    
     wire [6:0] led_source = sw[0] ? gpio_counter : pc_view;
     
-    // Map to outputs:
-    // 4 solid LEDs get bits [6:3] - these change slowly = VISIBLE!
-    // RGB LED gets bits [2:0] - these change faster
-    assign led[3:0] = ~led_source[6:3];  // LD5, LD4, LD3, LD2
+    // Map to outputs (inverted for active-low LEDs)
+    assign led[3:0] = ~led_source[6:3];
     assign led0_r   = ~led_source[2];
     assign led0_g   = ~led_source[1];
     assign led0_b   = ~led_source[0];
