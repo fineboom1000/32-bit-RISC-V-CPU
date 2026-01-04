@@ -168,7 +168,7 @@ I knew nothing about CPUs when I started. I have never written a line of asssemb
 Though, I learnt quickly, reading tons and tons of articlees, and even written about 50 pages of my own documenation—which if you are an employer with my resume you can find that on my Notion. It is very hard to demostrate this, but if I where to pin point a few things that matter the most but aren't emphasised ever when looking things up like "how to make a RISC_V CPU," below are 5 points which are relevant:
 
 1. **Clock domain challenges** - Synchronizing FPGA clock with CPU execution 
--(though this wasn't much, a WNS of -0.743 )
+-(though this wasn't much, a WNS of -0.743 was terrifying)
 2. **Critical path optimization** - Every gate delay matters at 100MHz
 3. **Block RAM constraints** - FPGA memory has specific timing requirements
 4. **Hardware debugging techniques** - Logic analyzers and systematic verification
