@@ -182,7 +182,7 @@ Though, I learnt quickly, reading tons and tons of articlees, and even written a
 - Arty S7-25 or S7-50 FPGA board
 - RISC-V GNU toolchain (for software compilation)
 
-If you are on mac and in a university, AWS provides 100 free credits: downlaod Vivado there and run things there. While I have never used AWS before this, it is not too hard to launch and instance.
+If you are on mac and are a student at a university, AWS provides 100 free credits (and more) for students: downlaod Vivado via AWS and run things there. While I have never used AWS before this, it is not too hard to launch and instance.
 Also, testing may be hard. Icarus Verilog works and GTKWave gave me tons of issues. I found that the fastest approach was asm test and tracing PC through the entire pipeline as if you are the PC. Again, a good design will leave you with very few errors, a bad one will leave you with a pile of work that is impossible to surmount.
 ### Synthesis & Programming
 
