@@ -1,6 +1,6 @@
  5-Stage Pipelined RISC-V Processor (RV32I)
 
-A fully functional, from-scratch implementation of a pipelined RISC-V processor synthesized on FPGA hardware.**
+**A fully functional, from-scratch implementation of a pipelined RISC-V processor synthesized on FPGA hardware.**
 
 <img width="523" height="476" alt="Screenshot 2026-01-04 at 2 37 52 PM" src="https://github.com/user-attachments/assets/b146a69f-9ce7-43f4-8aba-0c925813bb16" />
 
