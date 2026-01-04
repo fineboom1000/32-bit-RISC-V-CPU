@@ -2,7 +2,7 @@
 
 A fully functional, from-scratch implementation of a pipelined RISC-V processor synthesized on FPGA hardware.**
 
-![RISC-V Processor Running on Arty S7](docs/hardware_demo.jpg)
+![RISC-VCPU](https://github.com/user-attachments/assets/192d4795-7150-4b56-8848-ad7926e02fd3)
 *Binary counter running in real-time on the Arty S7 FPGA - every LED state represents actual processor execution!*
 
 Note: Full demo videos showing the processor in action are available in the `demos/` folder. They were too large to embed here, but showcase the binary counter and LED patterns running on real hardware.
